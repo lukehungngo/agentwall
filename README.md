@@ -18,8 +18,8 @@
 <p align="center">
   <img src="https://img.shields.io/pypi/v/agentwall?style=flat-square&color=blue" alt="PyPI version">
   <img src="https://img.shields.io/pypi/pyversions/agentwall?style=flat-square" alt="Python versions">
-  <img src="https://img.shields.io/github/license/soh/agentwall?style=flat-square" alt="License">
-  <img src="https://img.shields.io/github/actions/workflow/status/soh/agentwall/ci.yml?style=flat-square&label=CI" alt="CI">
+  <img src="https://img.shields.io/github/license/lukehungngo/agentwall?style=flat-square" alt="License">
+  <img src="https://img.shields.io/github/actions/workflow/status/lukehungngo/agentwall/ci.yml?style=flat-square&label=CI" alt="CI">
 </p>
 
 ---
@@ -288,7 +288,7 @@ AgentWall's detection rules are grounded in published security research:
 
 ```bash
 # Clone and install
-git clone https://github.com/soh/agentwall && cd agentwall
+git clone https://github.com/lukehungngo/agentwall && cd agentwall
 uv sync
 
 # Run tests
