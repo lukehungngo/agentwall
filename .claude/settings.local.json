@@ -15,7 +15,10 @@
       "WebSearch",
       "Bash(mkdir -p /tmp/agentwall-targets)",
       "Read(//tmp/**)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(agentwall scan:*)"
     ]
   }
 }

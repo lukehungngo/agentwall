@@ -371,4 +371,4 @@ Join the [Discussions](https://github.com/lukehungngo/agentwall/discussions) to 
 
 ## License
 
-AGPL-3.0
+MIT

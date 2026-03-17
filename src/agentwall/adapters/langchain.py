@@ -53,6 +53,15 @@ _DESTRUCTIVE_KEYWORDS = frozenset(
 _CODE_EXEC_CALLS = frozenset(["subprocess", "eval", "exec"])
 _CODE_EXEC_KEYWORDS = frozenset(["shell", "exec", "eval", "subprocess", "code", "script", "sql"])
 
+# All retrieval method names that indicate vector store queries
+_RETRIEVAL_METHODS = frozenset([
+    "similarity_search",
+    "similarity_search_with_score",
+    "max_marginal_relevance_search",
+    "as_retriever",
+    "get_relevant_documents",
+])
+
 
 class _FileVisitor(ast.NodeVisitor):
     """AST visitor for a single Python file."""
@@ -109,17 +118,39 @@ class _FileVisitor(ast.NodeVisitor):
             self._check_tool_class_call(node.value, node.lineno)
         self.generic_visit(node)
 
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        """Detect BaseTool subclasses."""
+        base_names = {_get_name(b) for b in node.bases}
+        if base_names & {"BaseTool", "StructuredTool"}:
+            name = node.name
+            desc = ast.get_docstring(node)
+            tool_spec = ToolSpec(
+                name=name,
+                description=desc,
+                source_file=self.source_file,
+                source_line=node.lineno,
+                is_destructive=_name_is_destructive(name),
+                accepts_code_execution=_class_has_code_exec(node),
+                has_user_scope_check=_class_has_user_scope_check(node),
+            )
+            self.tools.append(tool_spec)
+        self.generic_visit(node)
+
     def visit_Call(self, node: ast.Call) -> None:
         """Detect method calls on vector store instances."""
         func = node.func
         if isinstance(func, ast.Attribute):
             method = func.attr
-            # similarity_search / as_retriever / get_relevant_documents — retrieval calls
-            if method in {"similarity_search", "as_retriever", "get_relevant_documents"}:
+            # Retrieval calls — all similarity search variants + retriever creation
+            if method in _RETRIEVAL_METHODS:
                 self._mark_retrieval(node, func)
             # add_texts / add_documents — write calls
             elif method in {"add_texts", "add_documents"}:
                 self._mark_write(node, func)
+        # Detect load_tools() calls
+        func_name = _get_name(node.func)
+        if func_name == "load_tools":
+            self._handle_load_tools(node)
         self.generic_visit(node)
 
     # ── vector store helpers ──────────────────────────────────────────────────
@@ -191,6 +222,26 @@ class _FileVisitor(ast.NodeVisitor):
             self._vs_instances[mc.backend] = mc_updated
             if instance_name:
                 self._vs_instances[instance_name] = mc_updated
+
+    def _handle_load_tools(self, node: ast.Call) -> None:
+        """Detect load_tools(["tool_name", ...]) and register each tool."""
+        if not node.args:
+            return
+        first_arg = node.args[0]
+        if not isinstance(first_arg, ast.List):
+            return
+        for elt in first_arg.elts:
+            if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                name = elt.value
+                self.tools.append(ToolSpec(
+                    name=name,
+                    description=None,
+                    source_file=self.source_file,
+                    source_line=node.lineno,
+                    is_destructive=_name_is_destructive(name),
+                    accepts_code_execution=_name_accepts_code_exec(name),
+                    has_user_scope_check=False,
+                ))
 
     def _find_mc_by_instance(self, instance_name: str | None) -> MemoryConfig | None:
         if not instance_name:
@@ -291,6 +342,22 @@ def _desc_accepts_code_exec(desc: str | None) -> bool:
     return any(kw in low for kw in _CODE_EXEC_KEYWORDS)
 
 
+def _class_has_code_exec(node: ast.ClassDef) -> bool:
+    """Return True if any method in the class body contains code-execution calls."""
+    for item in node.body:
+        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and _body_has_code_exec(item):
+            return True
+    return False
+
+
+def _class_has_user_scope_check(node: ast.ClassDef) -> bool:
+    """Return True if any method in the class body has a user scope check."""
+    for item in node.body:
+        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and _body_has_user_scope_check(item):
+            return True
+    return False
+
+
 def _body_has_user_scope_check(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     """Heuristic: body raises PermissionError or checks user_id."""
     for child in ast.walk(node):
@@ -309,7 +376,7 @@ def _body_has_user_scope_check(node: ast.FunctionDef | ast.AsyncFunctionDef) -> 
 
 def _track_retrieval_assignments(tree: ast.Module, visitor: _FileVisitor) -> None:
     """Find assignments like `docs = vs.similarity_search(...)` and track the var name."""
-    retrieval_methods = {"similarity_search", "as_retriever", "get_relevant_documents"}
+    retrieval_methods = _RETRIEVAL_METHODS
     for node in ast.walk(tree):
         if not isinstance(node, ast.Assign):
             continue
