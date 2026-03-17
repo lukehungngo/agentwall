@@ -1,0 +1,170 @@
+rules:
+  # ── AW-MEM-001: No tenant filter on retrieval ──────────────────────────────
+
+  - id: aw-mem-001-similarity-search
+    languages: [python]
+    severity: ERROR
+    message: >
+      similarity_search() called without metadata filter.
+      Cross-user data leakage possible if vector store is multi-tenant.
+    patterns:
+      - pattern: $VS.similarity_search($QUERY, ...)
+      - pattern-not: $VS.similarity_search($QUERY, ..., filter=$FILTER, ...)
+      - pattern-not: $VS.similarity_search($QUERY, ..., where=$WHERE, ...)
+    metadata:
+      category: memory
+      agentwall-id: AW-MEM-001
+      confidence: HIGH
+      cwe: CWE-200
+
+  - id: aw-mem-001-as-retriever-no-filter
+    languages: [python]
+    severity: ERROR
+    message: >
+      as_retriever() called without search_kwargs filter.
+      Retrieved documents are not scoped to a specific user or tenant.
+    patterns:
+      - pattern: $VS.as_retriever(...)
+      - pattern-not: $VS.as_retriever(..., search_kwargs={"filter": $F, ...}, ...)
+    metadata:
+      category: memory
+      agentwall-id: AW-MEM-001
+      confidence: HIGH
+      cwe: CWE-200
+
+  - id: aw-mem-001-collection-query-no-where
+    languages: [python]
+    severity: ERROR
+    message: >
+      ChromaDB collection.query() called without where clause.
+      Returns globally closest vectors regardless of user ownership.
+    patterns:
+      - pattern: $COL.query(query_embeddings=$EMB, ...)
+      - pattern-not: $COL.query(query_embeddings=$EMB, ..., where=$WHERE, ...)
+      - pattern-not: $COL.query(query_embeddings=$EMB, ..., where_document=$WHERE, ...)
+    metadata:
+      category: memory
+      agentwall-id: AW-MEM-001
+      confidence: MEDIUM
+      cwe: CWE-200
+
+  # ── AW-MEM-002: Write metadata but no retrieval filter ─────────────────────
+
+  - id: aw-mem-002-add-texts-with-metadata
+    languages: [python]
+    severity: WARNING
+    message: >
+      add_texts() called with metadata but corresponding retrieval calls
+      may not include a matching filter. Verify retrieval is also filtered.
+    pattern: $VS.add_texts(..., metadatas=$META, ...)
+    metadata:
+      category: memory
+      agentwall-id: AW-MEM-002
+      confidence: MEDIUM
+      cwe: CWE-200
+
+  # ── AW-MEM-003: No access control configuration ───────────────────────────
+
+  - id: aw-mem-003-chroma-no-auth
+    languages: [python]
+    severity: WARNING
+    message: >
+      Chroma client created without authentication.
+      Any process with network access can read/write the collection.
+    patterns:
+      - pattern: chromadb.Client(...)
+      - pattern-not: chromadb.Client(..., settings=Settings(chroma_client_auth_provider=...), ...)
+    metadata:
+      category: memory
+      agentwall-id: AW-MEM-003
+      confidence: MEDIUM
+      cwe: CWE-287
+
+  - id: aw-mem-003-chroma-ephemeral
+    languages: [python]
+    severity: WARNING
+    message: >
+      ChromaDB EphemeralClient used — no persistence, no authentication.
+      Data is lost on restart and accessible without credentials.
+    pattern: chromadb.EphemeralClient(...)
+    metadata:
+      category: memory
+      agentwall-id: AW-MEM-003
+      confidence: HIGH
+      cwe: CWE-287
+
+  # ── AW-MEM-004: Injection patterns / unsafe defaults ───────────────────────
+
+  - id: aw-mem-004-allow-reset
+    languages: [python]
+    severity: WARNING
+    message: >
+      allow_reset=True permits full collection deletion via API.
+      An attacker who can reach the ChromaDB endpoint can wipe all data.
+    pattern: Settings(..., allow_reset=True, ...)
+    metadata:
+      category: memory
+      agentwall-id: AW-MEM-004
+      confidence: HIGH
+      cwe: CWE-276
+
+  - id: aw-mem-004-conversation-memory-no-isolation
+    languages: [python]
+    severity: WARNING
+    message: >
+      ConversationBufferMemory stores all conversation turns without
+      tenant isolation. Memory poisoning attacks can inject persistent
+      malicious content across sessions.
+    patterns:
+      - pattern: ConversationBufferMemory(...)
+      - pattern-not: ConversationBufferMemory(..., user_id=$UID, ...)
+    metadata:
+      category: memory
+      agentwall-id: AW-MEM-004
+      confidence: HIGH
+      cwe: CWE-94
+
+  - id: aw-mem-004-vectorstore-memory-no-filter
+    languages: [python]
+    severity: WARNING
+    message: >
+      VectorStoreRetrieverMemory retrieves context from a shared vector store.
+      Without input validation, this enables memory injection attacks (MINJA).
+    pattern: VectorStoreRetrieverMemory(...)
+    metadata:
+      category: memory
+      agentwall-id: AW-MEM-004
+      confidence: HIGH
+      cwe: CWE-94
+
+  # ── AW-MEM-005: No sanitization on retrieved content ───────────────────────
+
+  - id: aw-mem-005-direct-context-injection
+    languages: [python]
+    severity: WARNING
+    message: >
+      Retrieved documents passed directly into prompt template without sanitization.
+      Poisoned memory content can manipulate agent behavior.
+    patterns:
+      - pattern: |
+          $DOCS = $VS.similarity_search(...)
+          ...
+          $TEMPLATE.format(..., context=$DOCS, ...)
+    metadata:
+      category: memory
+      agentwall-id: AW-MEM-005
+      confidence: MEDIUM
+      cwe: CWE-94
+
+  - id: aw-mem-005-page-content-in-fstring
+    languages: [python]
+    severity: WARNING
+    message: >
+      Document page_content used in f-string without sanitization.
+      Poisoned vector store entries can inject instructions into agent context.
+    pattern: f"...{$DOC.page_content}..."
+    metadata:
+      category: memory
+      agentwall-id: AW-MEM-005
+      confidence: MEDIUM
+      cwe: CWE-94

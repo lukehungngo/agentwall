@@ -1,16 +1,18 @@
 <p align="center">
   <h1 align="center">AgentWall</h1>
   <p align="center">
-    <strong>Pre-deployment security scanner for AI agents</strong>
+    <strong>Memory security scanner for AI agents</strong>
   </p>
   <p align="center">
-    Finds memory leakage, memory poisoning, and unsafe tool permissions<br>in your LangChain agent — before you ship it.
+    Install in 10 seconds. First finding in 60 seconds.
   </p>
   <p align="center">
     <a href="#install">Install</a> &middot;
     <a href="#quick-start">Quick Start</a> &middot;
     <a href="#what-it-detects">Detection Rules</a> &middot;
+    <a href="#who-is-this-for">Who Is This For</a> &middot;
     <a href="#ci-integration">CI Setup</a> &middot;
+    <a href="BENCHMARK.md">Benchmark</a> &middot;
     <a href="#roadmap">Roadmap</a>
   </p>
 </p>
@@ -22,28 +24,10 @@
   <img src="https://img.shields.io/github/actions/workflow/status/lukehungngo/agentwall/ci.yml?style=flat-square&label=CI" alt="CI">
 </p>
 
----
-
-## Why AgentWall?
-
-Your agent works. But is it **safe**?
-
-```python
-# This looks fine. It isn't.
-docs = vectorstore.similarity_search(user_query)
-```
-
-That call returns the globally closest vectors — **including other users' data**. No error. No warning. Silent cross-tenant leakage.
-
-Three attack surfaces that no existing tool covers:
-
-| Attack | What happens | Example |
-|---|---|---|
-| **Memory leakage** | Agent retrieves another user's data via unfiltered similarity search | User A's medical records returned to User B |
-| **Memory poisoning** | Attacker injects malicious content into long-term memory that persists across sessions | "Ignore previous instructions" planted via crafted query ([MINJA](https://arxiv.org/abs/2024.minja), NeurIPS 2025) |
-| **Unsafe tool access** | Agent calls destructive tools (shell exec, file delete) without human approval | Prompt injection → `subprocess.run("rm -rf /")` |
-
-AgentWall scans your code statically, finds these issues, and tells you exactly how to fix them — **before production**.
+<!-- TODO: Replace with actual GIF recording of `agentwall scan examples/` -->
+<p align="center">
+  <img src="https://raw.githubusercontent.com/lukehungngo/agentwall/main/docs/demo.gif" alt="AgentWall demo" width="700">
+</p>
 
 ---
 
@@ -55,48 +39,24 @@ pip install agentwall
 
 That's it. Zero runtime dependencies on any vector store SDK. Fully offline.
 
-Optional extras for live vector store probing:
-
-```bash
-pip install agentwall[chroma]      # ChromaDB
-pip install agentwall[pgvector]    # PostgreSQL + pgvector
-pip install agentwall[pinecone]    # Pinecone
-pip install agentwall[qdrant]      # Qdrant
-pip install agentwall[neo4j]       # Neo4j
-pip install agentwall[weaviate]    # Weaviate
-```
-
----
-
 ## Quick Start
 
 ```bash
-# Scan any LangChain project
+# Your first scan — finds issues in under 60 seconds
 agentwall scan ./my-agent/
 
-# Force framework detection
-agentwall scan . --framework langchain
-
-# Export machine-readable JSON
-agentwall scan . --output report.json
-
-# CI mode — exit 1 on critical findings only
-agentwall scan . --fail-on critical
-
-# Report-only — never exit 1
-agentwall scan . --fail-on none
+# Try our example (ships with the repo)
+agentwall scan examples/
 ```
-
-### Example output
 
 ```
 AgentWall v0.1.0 — Memory Security Scanner
-Scanning: ./my-agent  Framework: langchain  Files: 3  Findings: 7
+Scanning: examples/  Framework: langchain  Files: 2  Findings: 7
 
 ──────────────────────────────  CRITICAL (1)  ──────────────────────────────
 
   AW-MEM-001  No tenant isolation in vector store
-  File: agent.py:8
+  File: unsafe_agent.py:24
   Vector store queries are executed without any user/tenant filter.
   A similarity search returns the globally closest vectors — including
   other users' data.
@@ -105,16 +65,69 @@ Scanning: ./my-agent  Framework: langchain  Files: 3  Findings: 7
 
 ────────────────────────────────  HIGH (3)  ────────────────────────────────
 
-  AW-MEM-003  Memory backend has no access control configuration
-  File: agent.py:8
-  ...
-
   AW-TOOL-001  Destructive tool accessible without approval gate
-  File: agent.py:13
+  File: unsafe_agent.py:33
   ...
 ```
 
 **Exit codes:** `0` clean | `1` findings at/above `--fail-on` threshold | `2` scan error
+
+---
+
+## Who Is This For?
+
+**AgentWall is built for teams shipping LangChain and LangGraph agents to production.**
+
+If you answer "yes" to any of these, you need AgentWall:
+
+- Your agent uses a shared vector store (Chroma, Pinecone, PGVector, etc.) across users
+- Your agent has tools that can execute code, delete files, or send messages
+- Your agent has long-term memory (ConversationBufferMemory, etc.)
+- You're going from prototype to production and need a security check
+
+**Who uses AgentWall:**
+- Solo AI engineers shipping side projects
+- Seed/Series A startups building multi-tenant agents
+- OSS contributors who want to ship safely
+- Teams that can't afford $50K+ enterprise security platforms
+
+**Not for you if:** You need runtime enforcement (see [Galileo](https://www.rungalileo.io/)), enterprise CISO dashboards (see [Noma](https://www.nomasecurity.com/)), or K8s-level guardrails (see [Operant](https://www.operant.ai/)). AgentWall is complementary — we shift-left, they enforce at runtime.
+
+---
+
+## The Problem
+
+```python
+# This looks fine. It isn't.
+docs = vectorstore.similarity_search(user_query)
+```
+
+That call returns the globally closest vectors — **including other users' data**. No error. No warning. Silent cross-tenant leakage.
+
+| Attack | What happens | Real-world example |
+|---|---|---|
+| **Memory leakage** | Agent retrieves another user's data via unfiltered similarity search | User A's medical records returned to User B |
+| **Memory poisoning** | Attacker injects malicious content into long-term memory | "Ignore previous instructions" planted via crafted query ([MINJA](https://arxiv.org/abs/2024.minja), NeurIPS 2025) |
+| **Unsafe tool access** | Agent calls destructive tools without human approval | Prompt injection triggers `subprocess.run("rm -rf /")` |
+
+---
+
+## Examples
+
+The repo includes a side-by-side comparison:
+
+| File | Description |
+|---|---|
+| [`examples/unsafe_agent.py`](examples/unsafe_agent.py) | Unfiltered vector store + shell exec tool + delete tool |
+| [`examples/fixed_agent.py`](examples/fixed_agent.py) | Same features, tenant-scoped, no destructive tools |
+
+```bash
+# Scan the unsafe agent — see 5+ findings
+agentwall scan examples/unsafe_agent.py
+
+# Scan the fixed agent — clean
+agentwall scan examples/fixed_agent.py
+```
 
 ---
 
@@ -144,6 +157,41 @@ Every finding includes the file, line number, description, and a concrete remedi
 
 ---
 
+## Analysis Layers
+
+AgentWall uses 9 analysis layers — each layer refines findings from the previous:
+
+| Layer | Technique | What it does |
+|---|---|---|
+| **L0** | Regex / Import Matching | Framework detection |
+| **L1** | Single-File AST | Kwarg inspection for filters, tools, permissions |
+| **L2** | Inter-Procedural Call Graph | Cross-file filter resolution via call chains |
+| **L3** | Taint Analysis | Tracks user identity from request entry to filter sink |
+| **L4** | Config Auditing | Scans .env, docker-compose, settings.py for insecure defaults |
+| **L5** | Semgrep Rules | Declarative pattern matching (requires `semgrep` binary) |
+| **L6** | Symbolic Analysis | Path-sensitive: detects filters missing on some branches |
+| **L7** | Runtime Instrumentation | Monkey-patches vector stores during test runs (`--dynamic`) |
+| **L8** | LLM Confidence Scoring | Reduces false positives via regex/Ollama/API (`--llm-assist`) |
+
+```bash
+# Default: L0-L6 (all static layers)
+agentwall scan .
+
+# Fast mode: L0-L2 only
+agentwall scan . --fast
+
+# Pick specific layers
+agentwall scan . --layers L1,L3,L6
+
+# Enable runtime instrumentation
+agentwall scan . --dynamic
+
+# Enable LLM-assisted confidence scoring
+agentwall scan . --llm-assist
+```
+
+---
+
 ## How It Works
 
 ```
@@ -152,15 +200,14 @@ agentwall scan ./project/
   ├─ 1. Detect framework    (pyproject.toml, imports)
   ├─ 2. AST parse            (ast.parse — never imports or runs your code)
   ├─ 3. Extract AgentSpec    (tools, vector stores, memory configs)
-  ├─ 4. MemoryAnalyzer       (isolation, filters, poisoning patterns)
-  ├─ 5. ToolAnalyzer         (permissions, scope, risk classification)
-  └─ 6. Report               (terminal, JSON, or SARIF)
+  ├─ 4. Run analysis layers  (L1-L8, configurable)
+  └─ 5. Report               (terminal, JSON, or SARIF)
 ```
 
 **Key design principles:**
 
 - **Static only** — all analysis via Python `ast` module. Your code is never imported, executed, or modified
-- **Zero network calls** — fully offline by default. Optional `--live` mode for real vector store probing
+- **Zero network calls** — fully offline by default. L7/L8 are opt-in
 - **Fail safe** — parse errors on individual files produce a warning and skip. The scan never crashes
 - **Conservative** — prefers false negatives over false positives. Findings you see are real
 
@@ -204,7 +251,16 @@ jobs:
           path: report.json
 ```
 
-SARIF output for GitHub Advanced Security tab is coming in v0.2.
+Optional extras for live probing:
+
+```bash
+pip install agentwall[chroma]      # ChromaDB
+pip install agentwall[pgvector]    # PostgreSQL + pgvector
+pip install agentwall[pinecone]    # Pinecone
+pip install agentwall[qdrant]      # Qdrant
+pip install agentwall[neo4j]       # Neo4j
+pip install agentwall[weaviate]    # Weaviate
+```
 
 ---
 
@@ -218,14 +274,24 @@ Code → Build  →  ★ AgentWall scan ★  →  Galileo/Operant  →  Noma/Zen
                  "Is it safe to ship?"   "Block bad actions"  "What happened?"
 ```
 
-AgentWall is the **shift-left** security tool for AI agents. Scan before you ship. Enforce at runtime with complementary tools.
+AgentWall scans what runtime tools don't: **the stateful memory and permission surface**.
 
-We are **not** competing with:
-- **Galileo Agent Control** — OSS control plane for policy governance
-- **Noma / Zenity / Operant** — enterprise runtime platforms
-- **Promptfoo** (now OpenAI) — prompt-level red-teaming and evals
+---
 
-AgentWall scans what they don't: **the stateful memory and permission surface**.
+## Benchmark: 10 Real-World Projects
+
+We scanned 10 popular LangChain projects (3,185 files total). **6 of 10 have confirmed memory security issues.**
+
+| Project | Stars | Findings | CRIT | HIGH | Top Rule |
+|---|---|---|---|---|---|
+| [Langchain-Chatchat](https://github.com/chatchat-space/Langchain-Chatchat) | ~37k | 22 | 14 | 5 | AW-MEM-001 |
+| [PrivateGPT](https://github.com/zylon-ai/private-gpt) | ~54k | 0 | 0 | 0 | — |
+| [Quivr](https://github.com/QuivrHQ/quivr) | ~36k | 2 | 2 | 0 | AW-MEM-001 |
+| [DocsGPT](https://github.com/arc53/DocsGPT) | ~15k | 8 | 3 | 2 | AW-MEM-001 |
+| [DB-GPT](https://github.com/eosphoros-ai/DB-GPT) | ~17k | 8 | 5 | 2 | AW-MEM-001 |
+| [Chat-LangChain](https://github.com/langchain-ai/chat-langchain) | ~6k | 7 | 0 | 7 | AW-CFG |
+
+**Post-fix false positive rate: ~0%.** Full results, methodology, and reproduction script: **[BENCHMARK.md](BENCHMARK.md)**
 
 ---
 
@@ -245,72 +311,61 @@ AgentWall's detection rules are grounded in published security research:
 
 ## Roadmap
 
-### v0.1.0 — Week 1 (current)
+### v0.1.0 — Core Scanner
 
-- [x] Project scaffold with CI (ruff, mypy strict, pytest)
-- [x] Core models: AgentSpec, Finding, ScanResult, Severity
 - [x] LangChain adapter: AST-based tool and vector store extraction
-- [x] MemoryAnalyzer: AW-MEM-001, AW-MEM-002, AW-MEM-003
-- [x] ToolAnalyzer: AW-TOOL-001 through AW-TOOL-005
-- [x] Terminal reporter (Rich, colored, grouped by severity)
-- [x] JSON reporter
-- [x] CLI: `agentwall scan` with `--framework`, `--output`, `--fail-on`
-- [x] Auto-detect framework from pyproject.toml and imports
-- [x] 47 tests passing, 0 lint errors, mypy strict clean
+- [x] Memory rules: AW-MEM-001 through AW-MEM-005
+- [x] Tool rules: AW-TOOL-001 through AW-TOOL-005
+- [x] Analysis layers L0-L8 (L7/L8 opt-in)
+- [x] Terminal reporter (Rich), JSON reporter
+- [x] CLI with `--fail-on`, `--layers`, `--fast`, `--dynamic`, `--llm-assist`
+- [x] 109 tests passing, ruff clean, mypy strict clean
 
-### v0.2.0 — Week 2 (in progress)
+### v0.2.0 — Hardening
 
-- [ ] MemoryAnalyzer: AW-MEM-004 (injection patterns), AW-MEM-005 (no sanitization)
 - [ ] ChromaDB live probe (`--live` mode)
 - [ ] SARIF 2.1.0 reporter (GitHub Advanced Security integration)
-- [ ] `agentwall version` subcommand
-- [ ] 60%+ test coverage
+- [ ] `# agentwall: safe` inline suppression comments
+- [ ] 80%+ test coverage
 
-### v0.3.0 — Week 3 (ship)
+### v0.3.0 — Ecosystem
 
 - [ ] PyPI publish: `pip install agentwall`
-- [ ] GitHub repo public (AGPL-3.0 license)
-- [ ] GitHub Actions reusable workflow
+- [ ] GitHub Action: `agentwall/scan-action@v1`
 - [ ] Launch blog: "We found memory leakage in 3 popular LangChain templates"
 
-### Future (if traction)
+### Future
 
 - [ ] OpenAI Agents SDK adapter
 - [ ] CrewAI adapter
-- [ ] Pinecone / pgvector live probes
+- [ ] Pinecone / pgvector / Neo4j live probes
 - [ ] MCP tool permission audit
-- [ ] GitHub Action: `agentwall/scan-action@v1`
-- [ ] `# agentwall: safe` inline suppression comments
 
 ---
 
 ## Development
 
 ```bash
-# Clone and install
 git clone https://github.com/lukehungngo/agentwall && cd agentwall
 uv sync
 
-# Run tests
-uv run pytest
-
-# Lint + type check
-uv run ruff check src/ tests/
-uv run mypy src/ --strict
-
-# Run scanner locally
-uv run agentwall scan tests/fixtures/langchain_unsafe/
+uv run pytest                          # Run tests
+uv run ruff check src/ tests/         # Lint
+uv run mypy src/ --strict             # Type check
+uv run agentwall scan examples/       # Run scanner on examples
 ```
 
 ---
 
 ## Contributing
 
-AgentWall is early-stage and contributions are welcome. The best ways to help:
+AgentWall is early-stage and contributions are welcome:
 
-1. **Try it on your agent** and file issues for false positives/negatives
+1. **Try it on your agent** and [report false positives](https://github.com/lukehungngo/agentwall/issues/new?template=false_positive.yml) or [false negatives](https://github.com/lukehungngo/agentwall/issues/new?template=false_negative.yml)
 2. **Add vector store probes** — each probe is a self-contained module
-3. **Request framework adapters** — OpenAI, CrewAI, AutoGen
+3. **[Request framework adapters](https://github.com/lukehungngo/agentwall/issues/new?template=adapter_request.yml)** — OpenAI, CrewAI, AutoGen
+
+Join the [Discussions](https://github.com/lukehungngo/agentwall/discussions) to share scan results, vote on the roadmap, or request frameworks.
 
 ---
 

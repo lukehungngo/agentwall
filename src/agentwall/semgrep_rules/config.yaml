@@ -1,0 +1,62 @@
+rules:
+  # ── AW-CFG: Configuration security ─────────────────────────────────────────
+
+  - id: aw-cfg-chroma-allow-reset
+    languages: [python]
+    severity: WARNING
+    message: >
+      ChromaDB Settings with allow_reset=True.
+      Any client can wipe the entire collection via API.
+    pattern: Settings(..., allow_reset=True, ...)
+    metadata:
+      category: config
+      agentwall-id: AW-CFG-allow-reset
+      confidence: HIGH
+      cwe: CWE-276
+
+  - id: aw-cfg-chroma-no-persist
+    languages: [python]
+    severity: WARNING
+    message: >
+      ChromaDB client without persist_directory.
+      Data will be lost on process restart.
+    patterns:
+      - pattern: Chroma(...)
+      - pattern-not: Chroma(..., persist_directory=$DIR, ...)
+      - pattern-not: Chroma(..., client=$CLIENT, ...)
+    metadata:
+      category: config
+      agentwall-id: AW-CFG-no-persist
+      confidence: MEDIUM
+      cwe: CWE-404
+
+  - id: aw-cfg-hardcoded-api-key
+    languages: [python]
+    severity: ERROR
+    message: >
+      Hardcoded API key in source code. Use environment variables.
+    patterns:
+      - pattern: |
+          $VAR = "sk-..."
+      - pattern: |
+          api_key="sk-..."
+    metadata:
+      category: config
+      agentwall-id: AW-CFG-hardcoded-secret
+      confidence: HIGH
+      cwe: CWE-798
+
+  - id: aw-cfg-pinecone-no-namespace
+    languages: [python]
+    severity: WARNING
+    message: >
+      Pinecone index queried without namespace.
+      All tenants share the same vector space.
+    patterns:
+      - pattern: $INDEX.query(vector=$VEC, ...)
+      - pattern-not: $INDEX.query(vector=$VEC, ..., namespace=$NS, ...)
+    metadata:
+      category: config
+      agentwall-id: AW-CFG-no-namespace
+      confidence: MEDIUM
+      cwe: CWE-200

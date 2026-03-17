@@ -9,7 +9,13 @@
       "Bash(uv --version)",
       "Bash(/dev/null -type f)",
       "Bash(grep -v \"^$\")",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(gh auth:*)",
+      "Bash(chmod +x /home/soh/working/agent-wall/.github/setup-labels.sh /home/soh/working/agent-wall/.github/setup-discussions.sh)",
+      "WebSearch",
+      "Bash(mkdir -p /tmp/agentwall-targets)",
+      "Read(//tmp/**)",
+      "Bash(chmod:*)"
     ]
   }
 }

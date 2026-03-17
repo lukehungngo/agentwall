@@ -1,0 +1,4 @@
+[project]
+name = "test-branching"
+version = "0.1.0"
+dependencies = ["langchain"]

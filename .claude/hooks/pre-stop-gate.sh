@@ -17,7 +17,7 @@ echo "→ ruff check"
 ruff check src/ tests/ --quiet
 
 echo "→ mypy"
-mypy src/ --strict --quiet
+mypy src/ --strict --no-error-summary 2>&1 | tail -20
 
 echo "→ pytest"
 pytest --tb=short -q 2>&1 | tail -30

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
@@ -21,6 +22,12 @@ class Category(str, Enum):
     TOOL = "tool"
 
 
+class ConfidenceLevel(str, Enum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
 class Finding(BaseModel):
     rule_id: str
     title: str
@@ -30,6 +37,8 @@ class Finding(BaseModel):
     file: Path | None = None
     line: int | None = None
     fix: str | None = None
+    confidence: ConfidenceLevel = ConfidenceLevel.HIGH
+    layer: str | None = None  # which analysis layer produced this
 
 
 class ToolSpec(BaseModel):
@@ -49,6 +58,7 @@ class MemoryConfig(BaseModel):
     has_metadata_filter_on_retrieval: bool = False
     has_metadata_on_write: bool = False
     sanitizes_retrieved_content: bool = False
+    has_injection_risk: bool = False
     collection_name: str | None = None
     source_file: Path | None = None
     source_line: int | None = None
@@ -83,3 +93,111 @@ class ScanResult(BaseModel):
         for f in self.findings:
             result[f.severity].append(f)
         return result
+
+
+# ── Call Graph models (L2) ───────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class FunctionRef:
+    """Reference to a function/method in a specific file."""
+
+    file: Path
+    name: str  # qualified: "ClassName.method" or "function_name"
+    lineno: int = 0
+
+
+@dataclass(frozen=True)
+class CallEdge:
+    """An edge in the inter-procedural call graph."""
+
+    caller: FunctionRef
+    callee: FunctionRef
+    call_site_line: int = 0
+    resolved: bool = True  # True if statically resolved
+
+
+@dataclass
+class CallGraph:
+    """Inter-procedural call graph."""
+
+    edges: list[CallEdge] = field(default_factory=list)
+    unresolved: list[tuple[Path, int]] = field(default_factory=list)
+
+    def callers_of(self, func_name: str) -> list[CallEdge]:
+        return [e for e in self.edges if e.callee.name == func_name]
+
+    def callees_of(self, func_name: str) -> list[CallEdge]:
+        return [e for e in self.edges if e.caller.name == func_name]
+
+    def reachable_from(self, func_name: str, visited: set[str] | None = None) -> set[str]:
+        """Return all functions reachable from func_name (forward traversal)."""
+        if visited is None:
+            visited = set()
+        if func_name in visited:
+            return visited
+        visited.add(func_name)
+        for edge in self.callees_of(func_name):
+            self.reachable_from(edge.callee.name, visited)
+        return visited
+
+
+# ── Taint models (L3) ───────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class TaintSource:
+    """A source of user identity data."""
+
+    name: str  # e.g. "request.user", "user_id"
+    file: Path
+    lineno: int
+
+
+@dataclass(frozen=True)
+class TaintSink:
+    """A sink where user identity should reach (filter kwarg)."""
+
+    name: str  # e.g. "similarity_search.filter"
+    file: Path
+    lineno: int
+
+
+@dataclass
+class TaintResult:
+    """Result of taint analysis for a single source-sink pair."""
+
+    source: TaintSource
+    sink: TaintSink
+    reaches: bool  # True if source data reaches the sink
+    path: list[str] = field(default_factory=list)  # variable chain
+
+
+# ── Scan configuration ──────────────────────────────────────────────────────
+
+
+@dataclass
+class ScanConfig:
+    """Configuration for which analysis layers to run."""
+
+    layers: set[str] = field(
+        default_factory=lambda: {"L0", "L1", "L2", "L3", "L4", "L5", "L6"}
+    )
+    dynamic: bool = False  # L7 — runtime instrumentation
+    llm_assist: bool = False  # L8 — LLM confidence scoring
+    semgrep_rules_dir: Path | None = None  # custom semgrep rules
+    target: Path = field(default_factory=lambda: Path("."))
+
+    @classmethod
+    def default(cls) -> ScanConfig:
+        return cls()
+
+    @classmethod
+    def fast(cls) -> ScanConfig:
+        """CI-friendly: L0-L2 only."""
+        return cls(layers={"L0", "L1", "L2"})
+
+    @classmethod
+    def full(cls) -> ScanConfig:
+        """Full audit: all static layers."""
+        return cls(layers={"L0", "L1", "L2", "L3", "L4", "L5", "L6"})

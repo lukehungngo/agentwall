@@ -1,0 +1,67 @@
+# GitHub Labels for AgentWall
+# Apply with: gh label create "name" --color "color" --description "desc" --force
+#
+# Or run: .github/setup-labels.sh
+
+# Triage
+- name: triage
+  color: "fbca04"
+  description: "Needs triage"
+
+# Issue types
+- name: false-positive
+  color: "d93f0b"
+  description: "AgentWall flagged safe code"
+- name: false-negative
+  color: "e99695"
+  description: "AgentWall missed a real vulnerability"
+- name: adapter-request
+  color: "0075ca"
+  description: "Request for new framework or vector store support"
+- name: bug
+  color: "d73a4a"
+  description: "Something isn't working"
+- name: enhancement
+  color: "a2eeef"
+  description: "New feature or improvement"
+- name: documentation
+  color: "0075ca"
+  description: "Documentation improvements"
+
+# Rules
+- name: "rule: AW-MEM"
+  color: "b60205"
+  description: "Related to memory security rules"
+- name: "rule: AW-TOOL"
+  color: "e4e669"
+  description: "Related to tool permission rules"
+
+# Layers
+- name: "layer: L1-L3"
+  color: "c5def5"
+  description: "AST / call graph / taint analysis"
+- name: "layer: L4-L6"
+  color: "bfdadc"
+  description: "Config / semgrep / symbolic analysis"
+- name: "layer: L7-L8"
+  color: "d4c5f9"
+  description: "Runtime / LLM-assisted analysis"
+
+# Priority
+- name: P0
+  color: "b60205"
+  description: "Critical — blocks release"
+- name: P1
+  color: "d93f0b"
+  description: "High — fix before next release"
+- name: P2
+  color: "fbca04"
+  description: "Medium — fix when possible"
+
+# Status
+- name: "good first issue"
+  color: "7057ff"
+  description: "Good for newcomers"
+- name: "help wanted"
+  color: "008672"
+  description: "Community contributions welcome"

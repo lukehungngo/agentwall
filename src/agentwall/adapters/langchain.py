@@ -25,6 +25,25 @@ _VECTOR_STORES: dict[str, str] = {
     "MongoDBAtlasVectorSearch": "mongodb",
 }
 
+# LangChain memory classes that store conversation history — inherently injection-risk
+# because they persist user-supplied content that can be poisoned (MINJA, MemoryGraft)
+_MEMORY_CLASSES: dict[str, str] = {
+    "ConversationBufferMemory": "conversation_buffer",
+    "ConversationBufferWindowMemory": "conversation_buffer_window",
+    "ConversationSummaryMemory": "conversation_summary",
+    "ConversationSummaryBufferMemory": "conversation_summary_buffer",
+    "VectorStoreRetrieverMemory": "vectorstore_retriever",
+    "ConversationEntityMemory": "conversation_entity",
+    "ConversationKGMemory": "conversation_kg",
+}
+
+# Known sanitization function/method names (heuristic)
+_SANITIZE_NAMES = frozenset([
+    "sanitize", "sanitise", "clean", "strip_tags", "escape",
+    "filter_content", "scrub", "bleach", "clean_text",
+    "sanitize_output", "sanitize_content",
+])
+
 # Tool names / keywords that indicate destructive behaviour
 _DESTRUCTIVE_KEYWORDS = frozenset(
     ["delete", "remove", "drop", "rm", "write", "send", "post", "execute", "run"]
@@ -46,6 +65,10 @@ class _FileVisitor(ast.NodeVisitor):
         self._vs_instances: dict[str, MemoryConfig] = {}
         # decorator @tool targets
         self._tool_decorated_funcs: set[str] = set()
+        # Track variables holding retrieved content (for sanitization detection)
+        self._retrieval_vars: set[str] = set()
+        # Track whether any sanitization was observed on retrieved content
+        self._has_sanitization: bool = False
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self._check_tool_decorator(node)
@@ -75,13 +98,14 @@ class _FileVisitor(ast.NodeVisitor):
                 self.tools.append(tool_spec)
 
     def visit_Assign(self, node: ast.Assign) -> None:
-        """Detect vector store instantiation and tools=[ ] lists."""
+        """Detect vector store instantiation, memory classes, and tools=[ ] lists."""
         if isinstance(node.value, ast.Call):
             # Capture the variable name so _mark_retrieval can resolve it later.
             var_name: str | None = None
             if node.targets and isinstance(node.targets[0], ast.Name):
                 var_name = node.targets[0].id
             self._check_vectorstore_call(node.value, node.lineno, var_name)
+            self._check_memory_class_call(node.value, node.lineno, var_name)
             self._check_tool_class_call(node.value, node.lineno)
         self.generic_visit(node)
 
@@ -90,8 +114,8 @@ class _FileVisitor(ast.NodeVisitor):
         func = node.func
         if isinstance(func, ast.Attribute):
             method = func.attr
-            # similarity_search / as_retriever — retrieval calls
-            if method in {"similarity_search", "as_retriever"}:
+            # similarity_search / as_retriever / get_relevant_documents — retrieval calls
+            if method in {"similarity_search", "as_retriever", "get_relevant_documents"}:
                 self._mark_retrieval(node, func)
             # add_texts / add_documents — write calls
             elif method in {"add_texts", "add_documents"}:
@@ -119,6 +143,24 @@ class _FileVisitor(ast.NodeVisitor):
         if var_name:
             self._vs_instances[var_name] = mc
         self._vs_instances[backend] = mc  # fallback key by backend type
+
+    def _check_memory_class_call(
+        self, call: ast.Call, lineno: int, var_name: str | None = None
+    ) -> None:
+        """Detect LangChain memory class instantiation (ConversationBufferMemory etc.)."""
+        class_name = _get_name(call.func)
+        if class_name not in _MEMORY_CLASSES:
+            return
+        backend = _MEMORY_CLASSES[class_name]
+        mc = MemoryConfig(
+            backend=backend,
+            has_injection_risk=True,  # memory classes persist user input — injection vector
+            source_file=self.source_file,
+            source_line=lineno,
+        )
+        self.memory_configs.append(mc)
+        if var_name:
+            self._vs_instances[var_name] = mc
 
     def _mark_retrieval(self, node: ast.Call, func: ast.Attribute) -> None:
         has_filter = _call_has_filter_kwarg(node)
@@ -265,6 +307,37 @@ def _body_has_user_scope_check(node: ast.FunctionDef | ast.AsyncFunctionDef) -> 
     return False
 
 
+def _track_retrieval_assignments(tree: ast.Module, visitor: _FileVisitor) -> None:
+    """Find assignments like `docs = vs.similarity_search(...)` and track the var name."""
+    retrieval_methods = {"similarity_search", "as_retriever", "get_relevant_documents"}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        if not isinstance(node.value, ast.Call):
+            continue
+        func = node.value.func
+        if isinstance(func, ast.Attribute) and func.attr in retrieval_methods:
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    visitor._retrieval_vars.add(target.id)
+
+
+def _detect_sanitization(tree: ast.Module, visitor: _FileVisitor) -> None:
+    """Detect if any sanitization function is called on retrieved content."""
+    if not visitor._retrieval_vars:
+        return
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func_name = _get_name(node.func)
+        if not func_name or func_name.lower() not in _SANITIZE_NAMES:
+            continue
+        for arg in node.args:
+            if isinstance(arg, ast.Name) and arg.id in visitor._retrieval_vars:
+                visitor._has_sanitization = True
+                return
+
+
 # ── Adapter ───────────────────────────────────────────────────────────────────
 
 
@@ -290,6 +363,17 @@ class LangChainAdapter:
 
             visitor = _FileVisitor(source_file=py_file)
             visitor.visit(tree)
+            # Track retrieval assignments at file level for sanitization detection
+            _track_retrieval_assignments(tree, visitor)
+            # Re-walk to detect sanitization after retrieval vars are known
+            _detect_sanitization(tree, visitor)
+            # Propagate sanitization info to memory configs
+            if visitor._has_sanitization:
+                visitor.memory_configs = [
+                    mc.model_copy(update={"sanitizes_retrieved_content": True})
+                    if not mc.sanitizes_retrieved_content else mc
+                    for mc in visitor.memory_configs
+                ]
             all_tools.extend(visitor.tools)
             all_memory.extend(visitor.memory_configs)
             scanned.append(py_file)

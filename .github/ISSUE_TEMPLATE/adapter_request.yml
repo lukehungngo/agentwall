@@ -1,0 +1,51 @@
+name: Adapter Request
+description: Request support for a new framework or vector store
+title: "[Adapter] "
+labels: ["adapter-request", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Want AgentWall to support your framework? Tell us about it.
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Request type
+      options:
+        - Framework adapter (e.g., CrewAI, AutoGen)
+        - Vector store probe (e.g., Milvus, Weaviate)
+        - Other integration
+    validations:
+      required: true
+
+  - type: input
+    id: name
+    attributes:
+      label: Framework / vector store name
+      placeholder: "CrewAI"
+    validations:
+      required: true
+
+  - type: input
+    id: pypi
+    attributes:
+      label: PyPI package name
+      placeholder: "crewai"
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: |
+        How does your framework handle memory/tools? Links to docs welcome.
+        If you have example code showing the memory pattern, paste it here.
+
+  - type: dropdown
+    id: willingness
+    attributes:
+      label: Would you contribute the adapter?
+      options:
+        - "Yes, I can submit a PR"
+        - "Maybe, with guidance"
+        - "No, just requesting"

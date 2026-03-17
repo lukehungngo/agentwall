@@ -1,0 +1,51 @@
+name: False Negative
+description: AgentWall missed a real vulnerability
+title: "[FN] "
+labels: ["false-negative", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! False negative reports help us close detection gaps.
+
+  - type: textarea
+    id: code
+    attributes:
+      label: Vulnerable code that was NOT flagged
+      description: "Paste the code AgentWall should have caught. Redact secrets."
+      render: python
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected finding
+      description: "Which rule should have fired and why?"
+    validations:
+      required: true
+
+  - type: input
+    id: rule
+    attributes:
+      label: Expected rule ID
+      placeholder: "AW-MEM-001"
+
+  - type: textarea
+    id: scan_output
+    attributes:
+      label: AgentWall output
+      description: "Paste the full scan output showing the miss."
+      render: text
+
+  - type: input
+    id: version
+    attributes:
+      label: AgentWall version
+      placeholder: "0.1.0"
+
+  - type: input
+    id: framework
+    attributes:
+      label: Framework + version
+      placeholder: "langchain 0.3.x"

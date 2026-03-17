@@ -1,0 +1,131 @@
+rules:
+  # ── AW-TOOL-001: Destructive tool without approval gate ────────────────────
+
+  - id: aw-tool-001-subprocess-in-tool
+    languages: [python]
+    severity: ERROR
+    message: >
+      Tool function calls subprocess without an approval gate.
+      Prompt injection can escalate to arbitrary command execution.
+    patterns:
+      - pattern-inside: |
+          @tool
+          def $FUNC(...):
+              ...
+      - pattern: subprocess.run(...)
+    metadata:
+      category: tool
+      agentwall-id: AW-TOOL-001
+      confidence: HIGH
+      cwe: CWE-78
+
+  - id: aw-tool-001-os-system-in-tool
+    languages: [python]
+    severity: ERROR
+    message: >
+      Tool function calls os.system() — allows arbitrary command execution.
+    patterns:
+      - pattern-inside: |
+          @tool
+          def $FUNC(...):
+              ...
+      - pattern: os.system(...)
+    metadata:
+      category: tool
+      agentwall-id: AW-TOOL-001
+      confidence: HIGH
+      cwe: CWE-78
+
+  # ── AW-TOOL-002: Arbitrary code execution ──────────────────────────────────
+
+  - id: aw-tool-002-eval-in-tool
+    languages: [python]
+    severity: ERROR
+    message: >
+      Tool function uses eval() — allows arbitrary Python code execution.
+    patterns:
+      - pattern-inside: |
+          @tool
+          def $FUNC(...):
+              ...
+      - pattern: eval(...)
+    metadata:
+      category: tool
+      agentwall-id: AW-TOOL-002
+      confidence: HIGH
+      cwe: CWE-95
+
+  - id: aw-tool-002-exec-in-tool
+    languages: [python]
+    severity: ERROR
+    message: >
+      Tool function uses exec() — allows arbitrary Python code execution.
+    patterns:
+      - pattern-inside: |
+          @tool
+          def $FUNC(...):
+              ...
+      - pattern: exec(...)
+    metadata:
+      category: tool
+      agentwall-id: AW-TOOL-002
+      confidence: HIGH
+      cwe: CWE-95
+
+  - id: aw-tool-002-shell-true
+    languages: [python]
+    severity: ERROR
+    message: >
+      subprocess called with shell=True inside a tool function.
+      Combined with user-controlled input, this enables command injection.
+    patterns:
+      - pattern-inside: |
+          @tool
+          def $FUNC(...):
+              ...
+      - pattern: subprocess.run(..., shell=True, ...)
+    metadata:
+      category: tool
+      agentwall-id: AW-TOOL-002
+      confidence: HIGH
+      cwe: CWE-78
+
+  # ── AW-TOOL-003: High-risk tool without scope check ───────────────────────
+
+  - id: aw-tool-003-file-delete-no-check
+    languages: [python]
+    severity: WARNING
+    message: >
+      Tool function deletes files without user-scope verification.
+    patterns:
+      - pattern-inside: |
+          @tool
+          def $FUNC(...):
+              ...
+      - pattern: os.remove(...)
+      - pattern-not-inside: |
+          if $COND:
+              ...
+              os.remove(...)
+    metadata:
+      category: tool
+      agentwall-id: AW-TOOL-003
+      confidence: MEDIUM
+      cwe: CWE-284
+
+  # ── AW-TOOL-004: Tool with no description ──────────────────────────────────
+
+  - id: aw-tool-004-structured-tool-no-desc
+    languages: [python]
+    severity: INFO
+    message: >
+      StructuredTool created without a description.
+      This blocks risk classification and degrades LLM tool selection.
+    patterns:
+      - pattern: StructuredTool(name=$NAME, func=$FUNC, ...)
+      - pattern-not: StructuredTool(..., description=$DESC, ...)
+    metadata:
+      category: tool
+      agentwall-id: AW-TOOL-004
+      confidence: HIGH
+      cwe: CWE-1059

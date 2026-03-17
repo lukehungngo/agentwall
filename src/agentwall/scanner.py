@@ -1,14 +1,20 @@
-"""Scanner orchestrator — ties together adapter, analyzers, and result."""
+"""Scanner orchestrator — ties together all analysis layers."""
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 
 from agentwall.adapters.langchain import LangChainAdapter
+from agentwall.analyzers.callgraph import CallGraphAnalyzer
+from agentwall.analyzers.config import ConfigAuditor
 from agentwall.analyzers.memory import MemoryAnalyzer
+from agentwall.analyzers.semgrep import SemgrepAnalyzer
+from agentwall.analyzers.symbolic import SymbolicAnalyzer
+from agentwall.analyzers.taint import TaintAnalyzer
 from agentwall.analyzers.tools import ToolAnalyzer
 from agentwall.detector import auto_detect_framework
-from agentwall.models import Finding, ScanResult, Severity
+from agentwall.models import Finding, ScanConfig, ScanResult, Severity
 
 _SEVERITY_RANK: dict[Severity, int] = {
     Severity.CRITICAL: 0,
@@ -23,8 +29,42 @@ def _sort_findings(findings: list[Finding]) -> list[Finding]:
     return sorted(findings, key=lambda f: _SEVERITY_RANK[f.severity])
 
 
-def scan(target: Path, framework: str | None = None) -> ScanResult:
-    """Run a full scan on *target* and return a ScanResult."""
+def _dedup_findings(findings: list[Finding]) -> list[Finding]:
+    """Remove duplicate findings (same rule_id + file + line)."""
+    seen: set[tuple[str, str | None, int | None]] = set()
+    result: list[Finding] = []
+    for f in findings:
+        key = (f.rule_id, str(f.file) if f.file else None, f.line)
+        if key not in seen:
+            seen.add(key)
+            result.append(f)
+    return result
+
+
+def scan(
+    target: Path,
+    framework: str | None = None,
+    config: ScanConfig | None = None,
+) -> ScanResult:
+    """Run a full scan on *target* and return a ScanResult.
+
+    Analysis layers (all additive — higher layers refine, not replace):
+        L0  Regex / Import Matching         (framework detection)
+        L1  Single-File AST Visitor         (kwarg inspection)
+        L2  Inter-Procedural Call Graph     (cross-file resolution)
+        L3  Taint Analysis                  (source → sink flow)
+        L4  Config Auditing                 (infra misconfiguration)
+        L5  Semgrep Rules                   (declarative patterns)
+        L6  Symbolic / Abstract Interp.     (path-sensitive)
+        L7  Runtime Instrumentation         (dynamic, opt-in)
+        L8  LLM-Assisted Confidence         (ambiguity resolver)
+    """
+    if config is None:
+        config = ScanConfig.default()
+
+    layers = config.layers
+
+    # ── L0: Framework detection ──────────────────────────────────────────
     detected = framework or auto_detect_framework(target)
 
     if detected != "langchain":
@@ -34,12 +74,85 @@ def scan(target: Path, framework: str | None = None) -> ScanResult:
             errors=[f"Unsupported or undetected framework: {detected!r}"],
         )
 
+    # ── L1: Single-file AST analysis ────────────────────────────────────
     adapter = LangChainAdapter()
     spec = adapter.parse(target)
 
-    memory_findings = MemoryAnalyzer().analyze(spec)
-    tool_findings = ToolAnalyzer().analyze(spec)
-    all_findings = _sort_findings(memory_findings + tool_findings)
+    all_findings: list[Finding] = []
+
+    if "L1" in layers:
+        memory_findings = MemoryAnalyzer().analyze(spec)
+        tool_findings = ToolAnalyzer().analyze(spec)
+        # Tag L1 findings
+        for f in memory_findings + tool_findings:
+            if f.layer is None:
+                all_findings.append(f.model_copy(update={"layer": "L1"}))
+            else:
+                all_findings.append(f)
+
+    # ── L2: Call graph analysis ──────────────────────────────────────────
+    if "L2" in layers and spec.source_files:
+        try:
+            l2 = CallGraphAnalyzer()
+            all_findings = l2.analyze(spec, list(all_findings), target)
+        except Exception as exc:
+            warnings.warn(f"L2 analysis failed: {exc}", stacklevel=2)
+
+    # ── L3: Taint analysis ──────────────────────────────────────────────
+    if "L3" in layers and spec.source_files:
+        try:
+            l3_findings = TaintAnalyzer().analyze(spec)
+            all_findings.extend(l3_findings)
+        except Exception as exc:
+            warnings.warn(f"L3 analysis failed: {exc}", stacklevel=2)
+
+    # ── L4: Config auditing ─────────────────────────────────────────────
+    if "L4" in layers:
+        try:
+            config_findings = ConfigAuditor().analyze(target)
+            all_findings.extend(config_findings)
+        except Exception as exc:
+            warnings.warn(f"L4 analysis failed: {exc}", stacklevel=2)
+
+    # ── L5: Semgrep rules ───────────────────────────────────────────────
+    if "L5" in layers:
+        try:
+            l5 = SemgrepAnalyzer(custom_rules_dir=config.semgrep_rules_dir)
+            all_findings.extend(l5.analyze(target))
+        except Exception as exc:
+            warnings.warn(f"L5 analysis failed: {exc}", stacklevel=2)
+
+    # ── L6: Symbolic analysis ───────────────────────────────────────────
+    if "L6" in layers and spec.source_files:
+        try:
+            l6_findings = SymbolicAnalyzer().analyze(spec)
+            all_findings.extend(l6_findings)
+        except Exception as exc:
+            warnings.warn(f"L6 analysis failed: {exc}", stacklevel=2)
+
+    # ── L7: Runtime instrumentation ─────────────────────────────────────
+    if config.dynamic:
+        try:
+            from agentwall.runtime.patcher import run_with_instrumentation
+
+            report = run_with_instrumentation(target)
+            all_findings.extend(report.to_findings())
+        except Exception as exc:
+            warnings.warn(f"L7 runtime analysis failed: {exc}", stacklevel=2)
+
+    # ── L8: LLM confidence scoring ──────────────────────────────────────
+    if config.llm_assist:
+        try:
+            from agentwall.analyzers.confidence import ConfidenceScorer
+
+            scorer = ConfidenceScorer(allow_local_llm=True, allow_api=False)
+            all_findings = scorer.apply_scores(all_findings)
+        except Exception as exc:
+            warnings.warn(f"L8 confidence scoring failed: {exc}", stacklevel=2)
+
+    # ── Finalize ────────────────────────────────────────────────────────
+    all_findings = _dedup_findings(all_findings)
+    all_findings = _sort_findings(all_findings)
 
     return ScanResult(
         target=target,
