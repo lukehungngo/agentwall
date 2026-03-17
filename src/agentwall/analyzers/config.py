@@ -9,16 +9,31 @@ from pathlib import Path
 from agentwall.models import Category, Finding, Severity
 
 # Directories to skip during config file search
-_SKIP_DIRS = frozenset([
-    ".git", ".venv", "venv", ".tox", "__pycache__", "node_modules",
-    ".mypy_cache", ".pytest_cache", ".ruff_cache", "dist", "build",
-    ".eggs", "site-packages", "semgrep_rules",
-])
+_SKIP_DIRS = frozenset(
+    [
+        ".git",
+        ".venv",
+        "venv",
+        ".tox",
+        "__pycache__",
+        "node_modules",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        "dist",
+        "build",
+        ".eggs",
+        "site-packages",
+        "semgrep_rules",
+    ]
+)
 
 # Config file patterns to scan
 _CONFIG_GLOBS = [
-    "docker-compose.yml", "docker-compose.yaml",
-    ".env", ".env.*",
+    "docker-compose.yml",
+    "docker-compose.yaml",
+    ".env",
+    ".env.*",
 ]
 
 # Patterns that indicate insecure configuration
@@ -33,7 +48,8 @@ _UNSAFE_PATTERNS: list[tuple[str, re.Pattern[str], str, str, Severity]] = [
     (
         "no-auth",
         re.compile(
-            r'(?:CHROMA_SERVER_AUTH|chroma_client_auth_provider)\s*[=:]\s*(?:None|null|""|' + r"''|\s*$)",
+            r'(?:CHROMA_SERVER_AUTH|chroma_client_auth_provider)\s*[=:]\s*(?:None|null|""|'
+            + r"''|\s*$)",
             re.MULTILINE,
         ),
         "Vector store authentication explicitly disabled",
@@ -64,7 +80,8 @@ _UNSAFE_PATTERNS: list[tuple[str, re.Pattern[str], str, str, Severity]] = [
     (
         "no-password",
         re.compile(
-            r'(?:PASSWORD|REDIS_PASSWORD|NEO4J_PASSWORD|MONGO_PASSWORD)\s*[=:]\s*(?:""|' + r"''|None|null|\s*$)",
+            r'(?:PASSWORD|REDIS_PASSWORD|NEO4J_PASSWORD|MONGO_PASSWORD)\s*[=:]\s*(?:""|'
+            + r"''|None|null|\s*$)",
             re.MULTILINE,
         ),
         "Service password is empty or unset",
@@ -105,10 +122,7 @@ def _should_skip(path: Path, target: Path) -> bool:
         rel = path.relative_to(target)
     except ValueError:
         return False
-    return any(
-        part in _SKIP_DIRS or part.endswith(".egg-info")
-        for part in rel.parts
-    )
+    return any(part in _SKIP_DIRS or part.endswith(".egg-info") for part in rel.parts)
 
 
 class ConfigAuditor:
@@ -127,9 +141,7 @@ class ConfigAuditor:
     def _find_config_files(self, target: Path) -> list[Path]:
         files: list[Path] = []
         for glob in _CONFIG_GLOBS:
-            files.extend(
-                f for f in target.rglob(glob) if not _should_skip(f, target)
-            )
+            files.extend(f for f in target.rglob(glob) if not _should_skip(f, target))
         return sorted(set(files))
 
     def _find_python_configs(self, target: Path) -> list[Path]:
@@ -137,15 +149,14 @@ class ConfigAuditor:
         patterns = ["**/settings.py", "**/config.py", "**/conf.py"]
         files: list[Path] = []
         for pattern in patterns:
-            files.extend(
-                f for f in target.rglob(pattern) if not _should_skip(f, target)
-            )
+            files.extend(f for f in target.rglob(pattern) if not _should_skip(f, target))
         return sorted(set(files))
 
     def _find_json_configs(self, target: Path) -> list[Path]:
         """Find JSON config files (e.g. Milvus config)."""
         return sorted(
-            f for f in target.rglob("*.json")
+            f
+            for f in target.rglob("*.json")
             if not _should_skip(f, target) and "config" in f.stem.lower()
         )
 
@@ -158,17 +169,19 @@ class ConfigAuditor:
 
         for rule_suffix, pattern, title, fix, severity in _UNSAFE_PATTERNS:
             for match in pattern.finditer(content):
-                line_num = content[:match.start()].count("\n") + 1
-                findings.append(Finding(
-                    rule_id=f"AW-CFG-{rule_suffix}",
-                    title=title,
-                    severity=severity,
-                    category=Category.MEMORY,
-                    description=f"Found in {path.name}: {match.group().strip()}",
-                    file=path,
-                    line=line_num,
-                    fix=fix,
-                ))
+                line_num = content[: match.start()].count("\n") + 1
+                findings.append(
+                    Finding(
+                        rule_id=f"AW-CFG-{rule_suffix}",
+                        title=title,
+                        severity=severity,
+                        category=Category.MEMORY,
+                        description=f"Found in {path.name}: {match.group().strip()}",
+                        file=path,
+                        line=line_num,
+                        fix=fix,
+                    )
+                )
         # Check for sensitive data in .env files
         if path.name.startswith(".env"):
             findings.extend(self._check_env_secrets(path, content))
@@ -188,17 +201,19 @@ class ConfigAuditor:
 
         for rule_suffix, pattern, title, fix, severity in _PYTHON_UNSAFE_PATTERNS:
             for match in pattern.finditer(content):
-                line_num = content[:match.start()].count("\n") + 1
-                findings.append(Finding(
-                    rule_id=f"AW-CFG-{rule_suffix}",
-                    title=title,
-                    severity=severity,
-                    category=Category.MEMORY,
-                    description=f"Found in {path.name}: {match.group().strip()}",
-                    file=path,
-                    line=line_num,
-                    fix=fix,
-                ))
+                line_num = content[: match.start()].count("\n") + 1
+                findings.append(
+                    Finding(
+                        rule_id=f"AW-CFG-{rule_suffix}",
+                        title=title,
+                        severity=severity,
+                        category=Category.MEMORY,
+                        description=f"Found in {path.name}: {match.group().strip()}",
+                        file=path,
+                        line=line_num,
+                        fix=fix,
+                    )
+                )
         return findings
 
     def _audit_json_file(self, path: Path) -> list[Finding]:
@@ -216,16 +231,18 @@ class ConfigAuditor:
         # Check for authorization disabled
         auth_val = data.get("authorization", {})
         if isinstance(auth_val, dict) and not auth_val.get("enabled", True):
-            findings.append(Finding(
-                rule_id="AW-CFG-auth-disabled",
-                title="Authorization explicitly disabled in config",
-                severity=Severity.HIGH,
-                category=Category.MEMORY,
-                description="authorization.enabled=false in configuration file.",
-                file=path,
-                line=1,
-                fix="Set authorization.enabled=true in production.",
-            ))
+            findings.append(
+                Finding(
+                    rule_id="AW-CFG-auth-disabled",
+                    title="Authorization explicitly disabled in config",
+                    severity=Severity.HIGH,
+                    category=Category.MEMORY,
+                    description="authorization.enabled=false in configuration file.",
+                    file=path,
+                    line=1,
+                    fix="Set authorization.enabled=true in production.",
+                )
+            )
 
         return findings
 
@@ -237,26 +254,37 @@ class ConfigAuditor:
             re.MULTILINE,
         )
         placeholders = {
-            "", "changeme", "your-key-here", "xxx", "CHANGE_ME",
-            "placeholder", "YOUR_API_KEY", "TODO", "dummy", "test", "example",
+            "",
+            "changeme",
+            "your-key-here",
+            "xxx",
+            "CHANGE_ME",
+            "placeholder",
+            "YOUR_API_KEY",
+            "TODO",
+            "dummy",
+            "test",
+            "example",
         }
         for match in secret_pattern.finditer(content):
             value = match.group(2).strip().strip("\"'")
             if value and value not in placeholders:
-                line_num = content[:match.start()].count("\n") + 1
-                findings.append(Finding(
-                    rule_id="AW-CFG-hardcoded-secret",
-                    title=f"Hardcoded secret in {path.name}: {match.group(1)}",
-                    severity=Severity.HIGH,
-                    category=Category.MEMORY,
-                    description=(
-                        f"Secret '{match.group(1)}' has a hardcoded value. "
-                        "This may be committed to version control."
-                    ),
-                    file=path,
-                    line=line_num,
-                    fix="Use environment variables or a secret manager. Never commit secrets.",
-                ))
+                line_num = content[: match.start()].count("\n") + 1
+                findings.append(
+                    Finding(
+                        rule_id="AW-CFG-hardcoded-secret",
+                        title=f"Hardcoded secret in {path.name}: {match.group(1)}",
+                        severity=Severity.HIGH,
+                        category=Category.MEMORY,
+                        description=(
+                            f"Secret '{match.group(1)}' has a hardcoded value. "
+                            "This may be committed to version control."
+                        ),
+                        file=path,
+                        line=line_num,
+                        fix="Use environment variables or a secret manager. Never commit secrets.",
+                    )
+                )
         return findings
 
     def _check_docker_compose(self, path: Path, content: str) -> list[Finding]:
@@ -267,24 +295,26 @@ class ConfigAuditor:
         )
         for match in _db_images.finditer(content):
             db_name = match.group(1)
-            line_num = content[:match.start()].count("\n") + 1
+            line_num = content[: match.start()].count("\n") + 1
             # Look forward ~1000 chars for auth env vars in this service block
             region_end = min(len(content), match.end() + 1000)
-            region = content[match.start():region_end]
+            region = content[match.start() : region_end]
             auth_keywords = ["AUTH", "PASSWORD", "TOKEN", "API_KEY", "SECRET"]
             if not any(kw in region.upper() for kw in auth_keywords):
-                findings.append(Finding(
-                    rule_id="AW-CFG-docker-no-auth",
-                    title=f"{db_name} container has no visible authentication config",
-                    severity=Severity.MEDIUM,
-                    category=Category.MEMORY,
-                    description=(
-                        f"Docker service using {db_name} image has no authentication "
-                        "environment variables. The service may be accessible without credentials."
-                    ),
-                    file=path,
-                    line=line_num,
-                    fix=f"Add authentication environment variables for {db_name}.",
-                ))
+                findings.append(
+                    Finding(
+                        rule_id="AW-CFG-docker-no-auth",
+                        title=f"{db_name} container has no visible authentication config",
+                        severity=Severity.MEDIUM,
+                        category=Category.MEMORY,
+                        description=(
+                            f"Docker service using {db_name} image has no authentication "
+                            "environment variables. The service may be accessible without credentials."
+                        ),
+                        file=path,
+                        line=line_num,
+                        fix=f"Add authentication environment variables for {db_name}.",
+                    )
+                )
 
         return findings

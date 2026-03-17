@@ -38,7 +38,9 @@ class TestToolAnalyzerTOOL002:
         assert "AW-TOOL-002" in rule_ids
 
     def test_does_not_fire_for_safe_tool(self) -> None:
-        tool = ToolSpec(name="search_web", description="Search the web", accepts_code_execution=False)
+        tool = ToolSpec(
+            name="search_web", description="Search the web", accepts_code_execution=False
+        )
         findings = ToolAnalyzer().analyze(_spec(tool))
         rule_ids = [f.rule_id for f in findings]
         assert "AW-TOOL-002" not in rule_ids

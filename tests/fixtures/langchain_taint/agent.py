@@ -1,4 +1,5 @@
 """Fixture: Agent with user_id parameter but no filter on retrieval."""
+
 from langchain_community.vectorstores import Chroma
 
 vectorstore = Chroma(collection_name="shared_docs")

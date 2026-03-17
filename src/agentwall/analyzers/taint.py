@@ -26,12 +26,22 @@ from agentwall.models import (
 
 _SOURCE_PATTERNS = [
     # Attribute access patterns
-    "request.user", "request.user_id", "request.headers",
-    "session.user_id", "session.user", "g.user",
-    "current_user", "auth.user",
+    "request.user",
+    "request.user_id",
+    "request.headers",
+    "session.user_id",
+    "session.user",
+    "g.user",
+    "current_user",
+    "auth.user",
     # Common parameter names
-    "user_id", "tenant_id", "org_id", "owner_id",
-    "user", "tenant", "owner",
+    "user_id",
+    "tenant_id",
+    "org_id",
+    "owner_id",
+    "user",
+    "tenant",
+    "owner",
 ]
 
 _SIMPLE_SOURCE_NAMES = frozenset(s for s in _SOURCE_PATTERNS if "." not in s)
@@ -56,7 +66,9 @@ class _TaintState:
     sources: list[TaintSource] = field(default_factory=list)
     sinks: list[TaintSink] = field(default_factory=list)
     flows: list[TaintResult] = field(default_factory=list)
-    static_filter_sinks: set[int] = field(default_factory=set)  # line numbers of sinks with static filters
+    static_filter_sinks: set[int] = field(
+        default_factory=set
+    )  # line numbers of sinks with static filters
 
 
 class _TaintVisitor(ast.NodeVisitor):
@@ -93,9 +105,7 @@ class _TaintVisitor(ast.NodeVisitor):
         self.state.tainted_vars = prev_tainted
         self._func_sources = prev_func_sources
 
-    def _check_params_for_sources(
-        self, node: ast.FunctionDef | ast.AsyncFunctionDef
-    ) -> None:
+    def _check_params_for_sources(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
         """Mark function parameters named user_id, tenant_id, etc. as tainted."""
         for arg in node.args.args:
             if arg.arg.lower() in _SIMPLE_SOURCE_NAMES:
@@ -150,9 +160,13 @@ class _TaintVisitor(ast.NodeVisitor):
                         # Find the specific source that taints this expression
                         source = self._find_taint_source(kw.value)
                         if source:
-                            self.state.flows.append(TaintResult(
-                                source=source, sink=sink, reaches=True,
-                            ))
+                            self.state.flows.append(
+                                TaintResult(
+                                    source=source,
+                                    sink=sink,
+                                    reaches=True,
+                                )
+                            )
                     else:
                         # kwarg exists but not tainted — static filter value
                         self.state.static_filter_sinks.add(node.lineno)
@@ -166,11 +180,13 @@ class _TaintVisitor(ast.NodeVisitor):
                 )
                 self.state.sinks.append(sink)
                 if self._func_sources:
-                    self.state.flows.append(TaintResult(
-                        source=self._func_sources[0],
-                        sink=sink,
-                        reaches=False,
-                    ))
+                    self.state.flows.append(
+                        TaintResult(
+                            source=self._func_sources[0],
+                            sink=sink,
+                            reaches=False,
+                        )
+                    )
 
         self.generic_visit(node)
 
@@ -246,44 +262,48 @@ class TaintAnalyzer:
         if all_sources and all_sinks:
             unreached = [f for f in all_flows if not f.reaches]
             for flow in unreached:
-                findings.append(Finding(
-                    rule_id="AW-MEM-001",
-                    title="User identity does not reach retrieval filter",
-                    severity=Severity.CRITICAL,
-                    category=Category.MEMORY,
-                    description=(
-                        f"User identity from '{flow.source.name}' "
-                        f"(at {flow.source.file.name}:{flow.source.lineno}) "
-                        f"does not flow into the retrieval filter "
-                        f"at {flow.sink.file.name}:{flow.sink.lineno}. "
-                        "The vector store query is not scoped to the current user."
-                    ),
-                    file=flow.sink.file,
-                    line=flow.sink.lineno,
-                    fix="Pass the user identity through to the filter kwarg.",
-                    confidence=ConfidenceLevel.HIGH,
-                    layer="L3",
-                ))
+                findings.append(
+                    Finding(
+                        rule_id="AW-MEM-001",
+                        title="User identity does not reach retrieval filter",
+                        severity=Severity.CRITICAL,
+                        category=Category.MEMORY,
+                        description=(
+                            f"User identity from '{flow.source.name}' "
+                            f"(at {flow.source.file.name}:{flow.source.lineno}) "
+                            f"does not flow into the retrieval filter "
+                            f"at {flow.sink.file.name}:{flow.sink.lineno}. "
+                            "The vector store query is not scoped to the current user."
+                        ),
+                        file=flow.sink.file,
+                        line=flow.sink.lineno,
+                        fix="Pass the user identity through to the filter kwarg.",
+                        confidence=ConfidenceLevel.HIGH,
+                        layer="L3",
+                    )
+                )
 
         # If sources exist but no sinks at all (no retrieval filter kwarg anywhere)
         if all_sources and not all_sinks:
             for mc in spec.memory_configs:
                 if not mc.has_metadata_filter_on_retrieval:
-                    findings.append(Finding(
-                        rule_id="AW-MEM-001",
-                        title="User identity available but no filter sink found",
-                        severity=Severity.CRITICAL,
-                        category=Category.MEMORY,
-                        description=(
-                            "User identity sources detected but no retrieval filter "
-                            "uses them. Vector store queries are not tenant-scoped."
-                        ),
-                        file=mc.source_file,
-                        line=mc.source_line,
-                        fix="Add filter={'user_id': user_id} to all retrieval calls.",
-                        confidence=ConfidenceLevel.HIGH,
-                        layer="L3",
-                    ))
+                    findings.append(
+                        Finding(
+                            rule_id="AW-MEM-001",
+                            title="User identity available but no filter sink found",
+                            severity=Severity.CRITICAL,
+                            category=Category.MEMORY,
+                            description=(
+                                "User identity sources detected but no retrieval filter "
+                                "uses them. Vector store queries are not tenant-scoped."
+                            ),
+                            file=mc.source_file,
+                            line=mc.source_line,
+                            fix="Add filter={'user_id': user_id} to all retrieval calls.",
+                            confidence=ConfidenceLevel.HIGH,
+                            layer="L3",
+                        )
+                    )
 
         # If sinks have static filter values (filter kwarg present but not tainted)
         reached_flows = [f for f in all_flows if f.reaches]
@@ -291,21 +311,23 @@ class TaintAnalyzer:
             for sink in all_sinks:
                 if (sink.file, sink.lineno) not in static_filter_lines:
                     continue
-                findings.append(Finding(
-                    rule_id="AW-MEM-002",
-                    title="Filter exists but does not contain user identity",
-                    severity=Severity.HIGH,
-                    category=Category.MEMORY,
-                    description=(
-                        f"Retrieval filter at {sink.file.name}:{sink.lineno} "
-                        "contains only static values — not scoped to the current user. "
-                        "This is a false sense of security."
-                    ),
-                    file=sink.file,
-                    line=sink.lineno,
-                    fix="Ensure the filter contains a user-scoped value like user_id.",
-                    confidence=ConfidenceLevel.MEDIUM,
-                    layer="L3",
-                ))
+                findings.append(
+                    Finding(
+                        rule_id="AW-MEM-002",
+                        title="Filter exists but does not contain user identity",
+                        severity=Severity.HIGH,
+                        category=Category.MEMORY,
+                        description=(
+                            f"Retrieval filter at {sink.file.name}:{sink.lineno} "
+                            "contains only static values — not scoped to the current user. "
+                            "This is a false sense of security."
+                        ),
+                        file=sink.file,
+                        line=sink.lineno,
+                        fix="Ensure the filter contains a user-scoped value like user_id.",
+                        confidence=ConfidenceLevel.MEDIUM,
+                        layer="L3",
+                    )
+                )
 
         return findings

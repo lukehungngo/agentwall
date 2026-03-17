@@ -1,4 +1,5 @@
 """Fixture: Cross-file caller — calls retriever.do_search()."""
+
 from retriever import do_search
 
 

@@ -36,7 +36,9 @@ def _semgrep_available() -> bool:
     try:
         result = subprocess.run(
             ["semgrep", "--version"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         return result.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -101,7 +103,11 @@ def _result_to_finding(result: dict[str, object]) -> Finding | None:
     confidence_str = metadata.get("confidence", "MEDIUM")
     if not isinstance(confidence_str, str):
         confidence_str = "MEDIUM"
-    confidence_map = {"HIGH": ConfidenceLevel.HIGH, "MEDIUM": ConfidenceLevel.MEDIUM, "LOW": ConfidenceLevel.LOW}
+    confidence_map = {
+        "HIGH": ConfidenceLevel.HIGH,
+        "MEDIUM": ConfidenceLevel.MEDIUM,
+        "LOW": ConfidenceLevel.LOW,
+    }
     confidence = confidence_map.get(confidence_str, ConfidenceLevel.MEDIUM)
 
     return Finding(
@@ -130,8 +136,7 @@ class SemgrepAnalyzer:
         """Run semgrep and return findings. Returns empty list if semgrep not installed."""
         if not _semgrep_available():
             warnings.warn(
-                "semgrep not installed — L5 analysis skipped. "
-                "Install with: pip install semgrep",
+                "semgrep not installed — L5 analysis skipped. Install with: pip install semgrep",
                 stacklevel=2,
             )
             return []
@@ -149,7 +154,8 @@ class SemgrepAnalyzer:
             result = subprocess.run(
                 [
                     "semgrep",
-                    "--config", str(rules_dir),
+                    "--config",
+                    str(rules_dir),
                     "--json",
                     "--quiet",
                     "--no-git-ignore",

@@ -1,4 +1,5 @@
 """Fixture: Agent with branching filter logic for L6 symbolic analysis."""
+
 from langchain_community.vectorstores import Chroma
 
 vectorstore = Chroma(collection_name="shared_docs")

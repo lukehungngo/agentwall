@@ -147,7 +147,9 @@ def _ollama_available() -> bool:
 
         result = subprocess.run(
             ["ollama", "list"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         return result.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -208,7 +210,9 @@ class ConfidenceScorer:
         self.allow_api = allow_api
         self.ollama_model = ollama_model
 
-    def score(self, findings: list[Finding], spec_metadata: dict[str, object] | None = None) -> list[ConfidenceVerdict]:
+    def score(
+        self, findings: list[Finding], spec_metadata: dict[str, object] | None = None
+    ) -> list[ConfidenceVerdict]:
         """Score confidence for a list of findings."""
         verdicts: list[ConfidenceVerdict] = []
         for finding in findings:
@@ -375,9 +379,9 @@ class ConfidenceScorer:
         updated: list[Finding] = []
         for verdict in verdicts:
             if verdict.scored_confidence != verdict.original_confidence:
-                updated.append(verdict.finding.model_copy(
-                    update={"confidence": verdict.scored_confidence}
-                ))
+                updated.append(
+                    verdict.finding.model_copy(update={"confidence": verdict.scored_confidence})
+                )
             else:
                 updated.append(verdict.finding)
         return updated

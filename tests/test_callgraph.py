@@ -27,6 +27,7 @@ class TestBuildCallGraph:
 
     def test_handles_empty_project(self) -> None:
         import tempfile
+
         with tempfile.TemporaryDirectory() as tmp:
             graph = build_call_graph(Path(tmp), [])
             assert graph.edges == []

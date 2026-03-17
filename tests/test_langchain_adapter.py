@@ -101,7 +101,9 @@ class TestLangChainAdapterRetrievalVariants:
         mc = spec.memory_configs[0]
         assert not mc.has_metadata_filter_on_retrieval
 
-    def test_similarity_search_with_score_filtered(self, adapter: LangChainAdapter, tmp_path: Path) -> None:
+    def test_similarity_search_with_score_filtered(
+        self, adapter: LangChainAdapter, tmp_path: Path
+    ) -> None:
         (tmp_path / "agent.py").write_text(
             "from langchain_community.vectorstores import Chroma\n"
             "vs = Chroma(collection_name='docs')\n"
@@ -142,7 +144,7 @@ class TestLangChainAdapterBaseToolInheritance:
         (tmp_path / "tool.py").write_text(
             "from langchain.tools import BaseTool\n"
             "class DeleteRecordTool(BaseTool):\n"
-            "    \"\"\"Deletes a record from the database.\"\"\"\n"
+            '    """Deletes a record from the database."""\n'
             "    name = 'delete_record'\n"
             "    def _run(self, record_id: str) -> str:\n"
             "        return 'deleted'\n",
@@ -155,7 +157,9 @@ class TestLangChainAdapterBaseToolInheritance:
         assert tool.is_destructive is True
         assert tool.description == "Deletes a record from the database."
 
-    def test_detects_structured_tool_subclass(self, adapter: LangChainAdapter, tmp_path: Path) -> None:
+    def test_detects_structured_tool_subclass(
+        self, adapter: LangChainAdapter, tmp_path: Path
+    ) -> None:
         (tmp_path / "tool.py").write_text(
             "from langchain.tools import StructuredTool\n"
             "class ExecuteCodeTool(StructuredTool):\n"
@@ -169,7 +173,9 @@ class TestLangChainAdapterBaseToolInheritance:
         assert tool.name == "ExecuteCodeTool"
         assert tool.accepts_code_execution is True
 
-    def test_basetool_with_user_scope_check(self, adapter: LangChainAdapter, tmp_path: Path) -> None:
+    def test_basetool_with_user_scope_check(
+        self, adapter: LangChainAdapter, tmp_path: Path
+    ) -> None:
         (tmp_path / "tool.py").write_text(
             "from langchain.tools import BaseTool\n"
             "class SafeDeleteTool(BaseTool):\n"
@@ -202,8 +208,7 @@ class TestLangChainAdapterLoadTools:
 
     def test_load_tools_shell_flagged(self, adapter: LangChainAdapter, tmp_path: Path) -> None:
         (tmp_path / "agent.py").write_text(
-            "from langchain.agents import load_tools\n"
-            "tools = load_tools(['shell'])\n",
+            "from langchain.agents import load_tools\ntools = load_tools(['shell'])\n",
             encoding="utf-8",
         )
         spec = adapter.parse(tmp_path)
@@ -212,8 +217,7 @@ class TestLangChainAdapterLoadTools:
 
     def test_load_tools_no_description(self, adapter: LangChainAdapter, tmp_path: Path) -> None:
         (tmp_path / "agent.py").write_text(
-            "from langchain.agents import load_tools\n"
-            "tools = load_tools(['arxiv'])\n",
+            "from langchain.agents import load_tools\ntools = load_tools(['arxiv'])\n",
             encoding="utf-8",
         )
         spec = adapter.parse(tmp_path)

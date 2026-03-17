@@ -180,9 +180,7 @@ class TaintResult:
 class ScanConfig:
     """Configuration for which analysis layers to run."""
 
-    layers: set[str] = field(
-        default_factory=lambda: {"L0", "L1", "L2", "L3", "L4", "L5", "L6"}
-    )
+    layers: set[str] = field(default_factory=lambda: {"L0", "L1", "L2", "L3", "L4", "L5", "L6"})
     dynamic: bool = False  # L7 — runtime instrumentation
     llm_assist: bool = False  # L8 — LLM confidence scoring
     semgrep_rules_dir: Path | None = None  # custom semgrep rules

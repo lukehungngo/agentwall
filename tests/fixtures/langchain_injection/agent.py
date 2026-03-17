@@ -1,4 +1,5 @@
 """Fixture: LangChain agent with memory injection vulnerabilities."""
+
 from langchain.memory import ConversationBufferMemory
 from langchain_community.vectorstores import Chroma
 

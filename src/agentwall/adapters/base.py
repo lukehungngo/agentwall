@@ -11,5 +11,4 @@ from agentwall.models import AgentSpec
 class AbstractAdapter(Protocol):
     """Parse a target directory into a normalised AgentSpec."""
 
-    def parse(self, target: Path) -> AgentSpec:
-        ...
+    def parse(self, target: Path) -> AgentSpec: ...

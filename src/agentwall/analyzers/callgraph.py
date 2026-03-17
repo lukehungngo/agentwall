@@ -23,10 +23,15 @@ from agentwall.models import (
 from agentwall.rules import RuleDef
 
 # Retrieval methods that indicate a vector store query
-_RETRIEVAL_METHODS = frozenset([
-    "similarity_search", "as_retriever", "get_relevant_documents",
-    "similarity_search_with_score", "max_marginal_relevance_search",
-])
+_RETRIEVAL_METHODS = frozenset(
+    [
+        "similarity_search",
+        "as_retriever",
+        "get_relevant_documents",
+        "similarity_search_with_score",
+        "max_marginal_relevance_search",
+    ]
+)
 
 # Filter kwargs that indicate tenant scoping
 _FILTER_KWARGS = frozenset(["filter", "where", "where_document"])
@@ -245,9 +250,9 @@ def build_call_graph(target: Path, source_files: list[Path]) -> CallGraph:
                 graph.unresolved.append((py_file, lineno))
                 continue
 
-            caller_ref = all_defs.get(caller_name, FunctionRef(
-                file=py_file, name=caller_name, lineno=0
-            ))
+            caller_ref = all_defs.get(
+                caller_name, FunctionRef(file=py_file, name=caller_name, lineno=0)
+            )
 
             # Try to resolve callee
             callee_ref = all_defs.get(callee_name)
@@ -260,19 +265,23 @@ def build_call_graph(target: Path, source_files: list[Path]) -> CallGraph:
                         callee_ref = class_defs[cls][method]
 
             if callee_ref:
-                graph.edges.append(CallEdge(
-                    caller=caller_ref,
-                    callee=callee_ref,
-                    call_site_line=lineno,
-                    resolved=True,
-                ))
+                graph.edges.append(
+                    CallEdge(
+                        caller=caller_ref,
+                        callee=callee_ref,
+                        call_site_line=lineno,
+                        resolved=True,
+                    )
+                )
             else:
-                graph.edges.append(CallEdge(
-                    caller=caller_ref,
-                    callee=FunctionRef(file=py_file, name=callee_name, lineno=0),
-                    call_site_line=lineno,
-                    resolved=False,
-                ))
+                graph.edges.append(
+                    CallEdge(
+                        caller=caller_ref,
+                        callee=FunctionRef(file=py_file, name=callee_name, lineno=0),
+                        call_site_line=lineno,
+                        resolved=False,
+                    )
+                )
 
     return graph
 
@@ -342,23 +351,30 @@ class CallGraphAnalyzer:
 
             if filter_found_upstream:
                 # Downgrade — filter applied via wrapper
-                refined.append(finding.model_copy(update={
-                    "severity": Severity.LOW,
-                    "description": (
-                        finding.description
-                        + " [L2: filter may be applied via wrapper function]"
-                    ),
-                    "confidence": ConfidenceLevel.MEDIUM,
-                    "layer": "L2",
-                }))
+                refined.append(
+                    finding.model_copy(
+                        update={
+                            "severity": Severity.LOW,
+                            "description": (
+                                finding.description
+                                + " [L2: filter may be applied via wrapper function]"
+                            ),
+                            "confidence": ConfidenceLevel.MEDIUM,
+                            "layer": "L2",
+                        }
+                    )
+                )
             else:
                 # Confirm as CRITICAL
-                refined.append(finding.model_copy(update={
-                    "description": (
-                        finding.description
-                        + " [L2: confirmed — no filter in call chain]"
-                    ),
-                    "layer": "L2",
-                }))
+                refined.append(
+                    finding.model_copy(
+                        update={
+                            "description": (
+                                finding.description + " [L2: confirmed — no filter in call chain]"
+                            ),
+                            "layer": "L2",
+                        }
+                    )
+                )
 
         return refined

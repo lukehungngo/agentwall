@@ -7,15 +7,17 @@ from agentwall.rules import AW_MEM_001, AW_MEM_002, AW_MEM_003, AW_MEM_004, AW_M
 
 # Memory class backends — these are LangChain conversation memory, not vector stores.
 # They get MEM-004 (injection risk) but NOT MEM-005 (which targets vector store retrieval).
-_MEMORY_CLASS_BACKENDS = frozenset([
-    "conversation_buffer",
-    "conversation_buffer_window",
-    "conversation_summary",
-    "conversation_summary_buffer",
-    "vectorstore_retriever",
-    "conversation_entity",
-    "conversation_kg",
-])
+_MEMORY_CLASS_BACKENDS = frozenset(
+    [
+        "conversation_buffer",
+        "conversation_buffer_window",
+        "conversation_summary",
+        "conversation_summary_buffer",
+        "vectorstore_retriever",
+        "conversation_entity",
+        "conversation_kg",
+    ]
+)
 
 
 def _finding_from_rule(rule: RuleDef, mc: MemoryConfig) -> Finding:

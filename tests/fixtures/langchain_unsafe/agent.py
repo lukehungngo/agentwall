@@ -13,7 +13,7 @@ docs = vectorstore.similarity_search(query)
 shell_tool = Tool(
     name="RunShell",
     func=lambda cmd: subprocess.run(cmd, shell=True, capture_output=True).stdout,
-    description="Run shell commands"
+    description="Run shell commands",
 )
 delete_tool = Tool(name="DeleteFile", func=lambda p: os.remove(p), description="Deletes a file")
 tools = [shell_tool, delete_tool]

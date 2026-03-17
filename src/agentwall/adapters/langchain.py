@@ -38,11 +38,21 @@ _MEMORY_CLASSES: dict[str, str] = {
 }
 
 # Known sanitization function/method names (heuristic)
-_SANITIZE_NAMES = frozenset([
-    "sanitize", "sanitise", "clean", "strip_tags", "escape",
-    "filter_content", "scrub", "bleach", "clean_text",
-    "sanitize_output", "sanitize_content",
-])
+_SANITIZE_NAMES = frozenset(
+    [
+        "sanitize",
+        "sanitise",
+        "clean",
+        "strip_tags",
+        "escape",
+        "filter_content",
+        "scrub",
+        "bleach",
+        "clean_text",
+        "sanitize_output",
+        "sanitize_content",
+    ]
+)
 
 # Tool names / keywords that indicate destructive behaviour
 _DESTRUCTIVE_KEYWORDS = frozenset(
@@ -54,13 +64,15 @@ _CODE_EXEC_CALLS = frozenset(["subprocess", "eval", "exec"])
 _CODE_EXEC_KEYWORDS = frozenset(["shell", "exec", "eval", "subprocess", "code", "script", "sql"])
 
 # All retrieval method names that indicate vector store queries
-_RETRIEVAL_METHODS = frozenset([
-    "similarity_search",
-    "similarity_search_with_score",
-    "max_marginal_relevance_search",
-    "as_retriever",
-    "get_relevant_documents",
-])
+_RETRIEVAL_METHODS = frozenset(
+    [
+        "similarity_search",
+        "similarity_search_with_score",
+        "max_marginal_relevance_search",
+        "as_retriever",
+        "get_relevant_documents",
+    ]
+)
 
 
 class _FileVisitor(ast.NodeVisitor):
@@ -87,9 +99,7 @@ class _FileVisitor(ast.NodeVisitor):
         self._check_tool_decorator(node)
         self.generic_visit(node)
 
-    def _check_tool_decorator(
-        self, node: ast.FunctionDef | ast.AsyncFunctionDef
-    ) -> None:
+    def _check_tool_decorator(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
         for dec in node.decorator_list:
             name = _get_name(dec)
             if name in {"tool", "langchain.tools.tool"}:
@@ -233,15 +243,17 @@ class _FileVisitor(ast.NodeVisitor):
         for elt in first_arg.elts:
             if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
                 name = elt.value
-                self.tools.append(ToolSpec(
-                    name=name,
-                    description=None,
-                    source_file=self.source_file,
-                    source_line=node.lineno,
-                    is_destructive=_name_is_destructive(name),
-                    accepts_code_execution=_name_accepts_code_exec(name),
-                    has_user_scope_check=False,
-                ))
+                self.tools.append(
+                    ToolSpec(
+                        name=name,
+                        description=None,
+                        source_file=self.source_file,
+                        source_line=node.lineno,
+                        is_destructive=_name_is_destructive(name),
+                        accepts_code_execution=_name_accepts_code_exec(name),
+                        has_user_scope_check=False,
+                    )
+                )
 
     def _find_mc_by_instance(self, instance_name: str | None) -> MemoryConfig | None:
         if not instance_name:
@@ -320,7 +332,11 @@ def _body_has_code_exec(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
             if isinstance(func, ast.Attribute) and func.attr in _CODE_EXEC_CALLS:
                 return True
             # import subprocess; subprocess.run(...)
-            if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name) and func.value.id in _CODE_EXEC_CALLS:
+            if (
+                isinstance(func, ast.Attribute)
+                and isinstance(func.value, ast.Name)
+                and func.value.id in _CODE_EXEC_CALLS
+            ):
                 return True
     return False
 
@@ -353,7 +369,9 @@ def _class_has_code_exec(node: ast.ClassDef) -> bool:
 def _class_has_user_scope_check(node: ast.ClassDef) -> bool:
     """Return True if any method in the class body has a user scope check."""
     for item in node.body:
-        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and _body_has_user_scope_check(item):
+        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and _body_has_user_scope_check(
+            item
+        ):
             return True
     return False
 
@@ -413,7 +431,8 @@ class LangChainAdapter:
 
     def parse(self, target: Path) -> AgentSpec:
         py_files = sorted(
-            f for f in target.rglob("*.py")
+            f
+            for f in target.rglob("*.py")
             if not any(part in _SKIP_DIRS for part in f.relative_to(target).parts)
         )
         all_tools: list[ToolSpec] = []
@@ -438,7 +457,8 @@ class LangChainAdapter:
             if visitor._has_sanitization:
                 visitor.memory_configs = [
                     mc.model_copy(update={"sanitizes_retrieved_content": True})
-                    if not mc.sanitizes_retrieved_content else mc
+                    if not mc.sanitizes_retrieved_content
+                    else mc
                     for mc in visitor.memory_configs
                 ]
             all_tools.extend(visitor.tools)

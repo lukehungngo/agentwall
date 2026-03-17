@@ -1,4 +1,5 @@
 """Fixture: Unsafe Python config with insecure vector store settings."""
+
 import chromadb
 
 # Ephemeral client — no persistence, no auth

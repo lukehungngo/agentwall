@@ -26,10 +26,15 @@ from agentwall.models import (
 )
 
 # Retrieval methods
-_RETRIEVAL_METHODS = frozenset([
-    "similarity_search", "as_retriever", "get_relevant_documents",
-    "similarity_search_with_score", "max_marginal_relevance_search",
-])
+_RETRIEVAL_METHODS = frozenset(
+    [
+        "similarity_search",
+        "as_retriever",
+        "get_relevant_documents",
+        "similarity_search_with_score",
+        "max_marginal_relevance_search",
+    ]
+)
 
 _FILTER_KWARGS = frozenset(["filter", "where", "where_document"])
 
@@ -65,9 +70,7 @@ class _PathAnalyzer(ast.NodeVisitor):
         self.has_retrieval: bool = False
         self.branch_results: list[FilterState] = []
 
-    def analyze_function(
-        self, node: ast.FunctionDef | ast.AsyncFunctionDef
-    ) -> FilterState:
+    def analyze_function(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> FilterState:
         """Analyze all paths through a function, return final state."""
         self.state = FilterState.BOTTOM
         self.has_retrieval = False
@@ -90,9 +93,9 @@ class _PathAnalyzer(ast.NodeVisitor):
         elif isinstance(stmt, ast.With | ast.AsyncWith):
             self._analyze_body(stmt.body)
         elif (
-            (isinstance(stmt, ast.Expr | ast.Assign | ast.AugAssign) and isinstance(stmt.value, ast.Call))
-            or (isinstance(stmt, ast.Return) and isinstance(getattr(stmt, "value", None), ast.Call))
-        ):
+            isinstance(stmt, ast.Expr | ast.Assign | ast.AugAssign)
+            and isinstance(stmt.value, ast.Call)
+        ) or (isinstance(stmt, ast.Return) and isinstance(getattr(stmt, "value", None), ast.Call)):
             self._analyze_call(stmt.value)  # type: ignore[arg-type]
 
     def _analyze_if(self, node: ast.If) -> None:
@@ -203,38 +206,42 @@ class SymbolicAnalyzer:
                     continue
 
                 if final_state == FilterState.UNFILTERED:
-                    findings.append(Finding(
-                        rule_id="AW-MEM-001",
-                        title=f"No filter on any path in {node.name}()",
-                        severity=Severity.CRITICAL,
-                        category=Category.MEMORY,
-                        description=(
-                            f"Function '{node.name}' performs vector store retrieval "
-                            "without a filter on all code paths."
-                        ),
-                        file=py_file,
-                        line=node.lineno,
-                        fix="Add filter= to all retrieval calls in this function.",
-                        confidence=ConfidenceLevel.HIGH,
-                        layer="L6",
-                    ))
+                    findings.append(
+                        Finding(
+                            rule_id="AW-MEM-001",
+                            title=f"No filter on any path in {node.name}()",
+                            severity=Severity.CRITICAL,
+                            category=Category.MEMORY,
+                            description=(
+                                f"Function '{node.name}' performs vector store retrieval "
+                                "without a filter on all code paths."
+                            ),
+                            file=py_file,
+                            line=node.lineno,
+                            fix="Add filter= to all retrieval calls in this function.",
+                            confidence=ConfidenceLevel.HIGH,
+                            layer="L6",
+                        )
+                    )
                 elif final_state == FilterState.TOP:
                     # Mixed: some paths filtered, some not
-                    findings.append(Finding(
-                        rule_id="AW-MEM-001",
-                        title=f"Filter missing on some paths in {node.name}()",
-                        severity=Severity.HIGH,
-                        category=Category.MEMORY,
-                        description=(
-                            f"Function '{node.name}' has vector store retrieval "
-                            "with a filter on some code paths but not all. "
-                            "At least one execution path lacks tenant scoping."
-                        ),
-                        file=py_file,
-                        line=node.lineno,
-                        fix="Ensure filter= is applied on ALL branches.",
-                        confidence=ConfidenceLevel.MEDIUM,
-                        layer="L6",
-                    ))
+                    findings.append(
+                        Finding(
+                            rule_id="AW-MEM-001",
+                            title=f"Filter missing on some paths in {node.name}()",
+                            severity=Severity.HIGH,
+                            category=Category.MEMORY,
+                            description=(
+                                f"Function '{node.name}' has vector store retrieval "
+                                "with a filter on some code paths but not all. "
+                                "At least one execution path lacks tenant scoping."
+                            ),
+                            file=py_file,
+                            line=node.lineno,
+                            fix="Ensure filter= is applied on ALL branches.",
+                            confidence=ConfidenceLevel.MEDIUM,
+                            layer="L6",
+                        )
+                    )
 
         return findings

@@ -1,4 +1,5 @@
 """Fixture: Cross-file retrieval — retriever defined here."""
+
 from langchain_community.vectorstores import Chroma
 
 vectorstore = Chroma(collection_name="shared_docs")

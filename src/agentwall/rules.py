@@ -144,7 +144,15 @@ AW_TOOL_005 = RuleDef(
 ALL_RULES: dict[str, RuleDef] = {
     r.rule_id: r
     for r in [
-        AW_MEM_001, AW_MEM_002, AW_MEM_003, AW_MEM_004, AW_MEM_005,
-        AW_TOOL_001, AW_TOOL_002, AW_TOOL_003, AW_TOOL_004, AW_TOOL_005,
+        AW_MEM_001,
+        AW_MEM_002,
+        AW_MEM_003,
+        AW_MEM_004,
+        AW_MEM_005,
+        AW_TOOL_001,
+        AW_TOOL_002,
+        AW_TOOL_003,
+        AW_TOOL_004,
+        AW_TOOL_005,
     ]
 }

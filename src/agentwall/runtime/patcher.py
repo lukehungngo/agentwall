@@ -33,7 +33,10 @@ logger = logging.getLogger("agentwall.runtime")
 # Methods to patch
 _PATCH_TARGETS: dict[str, list[str]] = {
     # module_path: [method_names]
-    "langchain_community.vectorstores.chroma": ["similarity_search", "similarity_search_with_score"],
+    "langchain_community.vectorstores.chroma": [
+        "similarity_search",
+        "similarity_search_with_score",
+    ],
     "langchain_community.vectorstores.pgvector": ["similarity_search"],
     "langchain_community.vectorstores.pinecone": ["similarity_search"],
     "langchain_community.vectorstores.qdrant": ["similarity_search"],
@@ -69,22 +72,24 @@ class RuntimeReport:
         """Convert runtime violations to AgentWall findings."""
         findings: list[Finding] = []
         for v in self.violations:
-            findings.append(Finding(
-                rule_id="AW-MEM-001",
-                title=f"Runtime: unfiltered {v.method}() call",
-                severity=Severity.CRITICAL,
-                category=Category.MEMORY,
-                description=(
-                    f"At runtime, {v.method}() was called without a filter kwarg "
-                    f"at {v.file}:{v.line}. This is a confirmed cross-tenant "
-                    "data leakage vector."
-                ),
-                file=Path(v.file) if v.file != "<unknown>" else None,
-                line=v.line if v.line > 0 else None,
-                fix="Add filter={'user_id': user_id} to this retrieval call.",
-                confidence=ConfidenceLevel.HIGH,
-                layer="L7",
-            ))
+            findings.append(
+                Finding(
+                    rule_id="AW-MEM-001",
+                    title=f"Runtime: unfiltered {v.method}() call",
+                    severity=Severity.CRITICAL,
+                    category=Category.MEMORY,
+                    description=(
+                        f"At runtime, {v.method}() was called without a filter kwarg "
+                        f"at {v.file}:{v.line}. This is a confirmed cross-tenant "
+                        "data leakage vector."
+                    ),
+                    file=Path(v.file) if v.file != "<unknown>" else None,
+                    line=v.line if v.line > 0 else None,
+                    fix="Add filter={'user_id': user_id} to this retrieval call.",
+                    confidence=ConfidenceLevel.HIGH,
+                    layer="L7",
+                )
+            )
         return findings
 
 
@@ -140,7 +145,9 @@ def _make_wrapper(
             _report.violations.append(violation)
             logger.warning(
                 "AW-MEM-001: %s() called without filter at %s:%d",
-                method_name, caller_file, caller_line,
+                method_name,
+                caller_file,
+                caller_line,
             )
 
         return original(*args, **kwargs)
@@ -300,12 +307,14 @@ with open(report_path, "w") as f:
                 filtered_calls=raw.get("filtered_calls", 0),
             )
             for v in raw.get("violations", []):
-                result.violations.append(RuntimeViolation(
-                    method=v["method"],
-                    file=v["file"],
-                    line=v["line"],
-                    kwargs={},
-                ))
+                result.violations.append(
+                    RuntimeViolation(
+                        method=v["method"],
+                        file=v["file"],
+                        line=v["line"],
+                        kwargs={},
+                    )
+                )
             return result
 
         # Subprocess ran but produced no report — instrumentation failed

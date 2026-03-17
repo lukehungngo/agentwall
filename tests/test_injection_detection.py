@@ -18,7 +18,9 @@ class TestAdapterMemoryClassDetection:
 
     def test_memory_class_has_injection_risk(self) -> None:
         spec = LangChainAdapter().parse(FIXTURES)
-        mem_class_configs = [mc for mc in spec.memory_configs if mc.backend == "conversation_buffer"]
+        mem_class_configs = [
+            mc for mc in spec.memory_configs if mc.backend == "conversation_buffer"
+        ]
         assert len(mem_class_configs) >= 1
         assert mem_class_configs[0].has_injection_risk is True
 
