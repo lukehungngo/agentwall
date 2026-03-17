@@ -18,10 +18,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/pypi/v/agentwall?style=flat-square&color=blue" alt="PyPI version">
-  <img src="https://img.shields.io/pypi/pyversions/agentwall?style=flat-square" alt="Python versions">
-  <img src="https://img.shields.io/github/license/lukehungngo/agentwall?style=flat-square" alt="License">
-  <img src="https://img.shields.io/github/actions/workflow/status/lukehungngo/agentwall/ci.yml?style=flat-square&label=CI" alt="CI">
+  <a href="https://pypi.org/project/agentwall/"><img src="https://img.shields.io/pypi/v/agentwall?style=flat-square&color=blue" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/agentwall/"><img src="https://img.shields.io/pypi/pyversions/agentwall?style=flat-square" alt="Python versions"></a>
+  <a href="https://github.com/lukehungngo/agentwall/blob/main/LICENSE"><img src="https://img.shields.io/github/license/lukehungngo/agentwall?style=flat-square" alt="License"></a>
+  <img src="https://img.shields.io/badge/tests-216%20passing-brightgreen?style=flat-square" alt="Tests">
+  <img src="https://img.shields.io/badge/coverage-72%25-yellow?style=flat-square" alt="Coverage">
 </p>
 
 <!-- TODO: Replace with actual GIF recording of `agentwall scan examples/` -->
