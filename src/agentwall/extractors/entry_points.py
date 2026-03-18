@@ -1,0 +1,140 @@
+"""Extract entry points (HTTP routes, background jobs) from AST."""
+
+from __future__ import annotations
+
+import ast
+from pathlib import Path
+from typing import Iterator
+
+from agentwall.models import ASMConfidence, EntryPoint, Provenance
+
+# HTTP method decorators (FastAPI and Flask)
+_HTTP_METHODS = frozenset({"get", "post", "put", "patch", "delete", "head", "options"})
+
+# Background job decorators
+_JOB_DECORATORS = frozenset({"task", "shared_task"})
+
+# Auth dependency patterns (FastAPI Depends)
+_AUTH_PATTERNS = frozenset({
+    "get_current_user", "get_current_active_user", "get_user",
+    "require_auth", "require_login", "auth_required",
+    "current_user", "authenticated",
+})
+
+_counter = 0
+
+
+def _next_id() -> str:
+    global _counter
+    _counter += 1
+    return f"ep-{_counter}"
+
+
+def reset_id_counter() -> None:
+    global _counter
+    _counter = 0
+
+
+def extract_entry_points(tree: ast.Module, file: Path) -> list[EntryPoint]:
+    """Extract entry points from an AST module."""
+    results: list[EntryPoint] = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            ep = _check_function(node, file)
+            if ep is not None:
+                results.append(ep)
+    return results
+
+
+def _check_function(
+    node: ast.FunctionDef | ast.AsyncFunctionDef, file: Path
+) -> EntryPoint | None:
+    for dec in node.decorator_list:
+        result = _check_decorator(dec, node, file)
+        if result is not None:
+            return result
+    return None
+
+
+def _check_decorator(
+    dec: ast.expr,
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+    file: Path,
+) -> EntryPoint | None:
+    # FastAPI/Flask: @app.get("/path"), @router.post("/path"), @app.route("/path")
+    if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Attribute):
+        method = dec.func.attr
+        if method in _HTTP_METHODS or method == "route":
+            auth, mechanism, user_source = _detect_auth(node)
+            return EntryPoint(
+                id=_next_id(),
+                kind="http_route",
+                provenance=Provenance(
+                    file=file, line=node.lineno, col=node.col_offset,
+                    symbol=node.name,
+                ),
+                auth=auth,
+                auth_mechanism=mechanism,
+                user_id_source=user_source,
+                confidence=ASMConfidence.CONFIRMED,
+            )
+
+    # Celery: @celery.task, @app.task, @shared_task
+    dec_name = _get_decorator_name(dec)
+    if dec_name in _JOB_DECORATORS:
+        return EntryPoint(
+            id=_next_id(),
+            kind="background_job",
+            provenance=Provenance(
+                file=file, line=node.lineno, col=node.col_offset,
+                symbol=node.name,
+            ),
+            auth="unauthenticated",
+            auth_mechanism=None,
+            user_id_source=None,
+            confidence=ASMConfidence.CONFIRMED,
+        )
+
+    return None
+
+
+def _get_decorator_name(dec: ast.expr) -> str | None:
+    if isinstance(dec, ast.Name):
+        return dec.id
+    if isinstance(dec, ast.Attribute):
+        return dec.attr
+    if isinstance(dec, ast.Call):
+        return _get_decorator_name(dec.func)
+    return None
+
+
+def _detect_auth(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> tuple[str, str | None, str | None]:
+    """Detect auth from function parameters (FastAPI Depends pattern)."""
+    for arg in node.args.defaults + [d for d in node.args.kw_defaults if d is not None]:
+        if isinstance(arg, ast.Call):
+            func_name = _get_decorator_name(arg.func)
+            if func_name == "Depends" and arg.args:
+                dep_name = _get_decorator_name(arg.args[0])
+                if dep_name and dep_name.lower() in _AUTH_PATTERNS:
+                    param_name = _find_param_with_default(node, arg)
+                    return "authenticated", f"Depends({dep_name})", param_name
+    return "unknown", None, None
+
+
+def _find_param_with_default(
+    node: ast.FunctionDef | ast.AsyncFunctionDef, default: ast.expr
+) -> str | None:
+    args = node.args
+    n_defaults = len(args.defaults)
+    n_args = len(args.args)
+    for i, d in enumerate(args.defaults):
+        if d is default:
+            arg_idx = n_args - n_defaults + i
+            if arg_idx < n_args:
+                return args.args[arg_idx].arg
+    for i, d in enumerate(args.kw_defaults):
+        if d is default:
+            return args.kwonlyargs[i].arg
+    return None

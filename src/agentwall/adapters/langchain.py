@@ -322,6 +322,32 @@ def _call_has_metadata_kwarg(node: ast.Call) -> bool:
     return any(kw.arg == "metadata" for kw in node.keywords)
 
 
+def extract_dict_keys(call: ast.Call, kwarg_name: str) -> frozenset[str]:
+    """Extract string keys from a dict literal passed as a keyword argument."""
+    for kw in call.keywords:
+        if kw.arg == kwarg_name and isinstance(kw.value, ast.Dict):
+            keys: list[str] = []
+            for key in kw.value.keys:
+                if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                    keys.append(key.value)
+            return frozenset(keys)
+    return frozenset()
+
+
+def classify_collection_name(call: ast.Call) -> tuple[str | None, bool]:
+    """Classify collection_name kwarg as (name, is_static).
+
+    Returns (literal_string, True) for string constants,
+    (None, False) for f-strings/variables/missing.
+    """
+    for kw in call.keywords:
+        if kw.arg == "collection_name":
+            if isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
+                return kw.value.value, True
+            return None, False
+    return None, False
+
+
 def _body_has_code_exec(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     """Return True if the function body contains code-execution calls."""
     for child in ast.walk(node):
