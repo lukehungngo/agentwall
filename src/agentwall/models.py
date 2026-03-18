@@ -35,6 +35,21 @@ CONFIDENCE_RANK: dict[ConfidenceLevel, int] = {
 }
 
 
+class ASMConfidence(str, Enum):
+    """Confidence level for ASM nodes and edges."""
+
+    CONFIRMED = "confirmed"
+    INFERRED = "inferred"
+    UNKNOWN = "unknown"
+
+
+ASM_CONFIDENCE_RANK: dict[ASMConfidence, int] = {
+    ASMConfidence.CONFIRMED: 0,
+    ASMConfidence.INFERRED: 1,
+    ASMConfidence.UNKNOWN: 2,
+}
+
+
 class Finding(BaseModel):
     rule_id: str
     title: str
@@ -47,6 +62,8 @@ class Finding(BaseModel):
     confidence: ConfidenceLevel = ConfidenceLevel.HIGH
     layer: str | None = None  # which analysis layer produced this
     file_context: str | None = None  # e.g. "test file", "example"
+    evidence_path: list[dict[str, object]] | None = None  # ASM path witness
+    proof_strength: str | None = None  # "confirmed" | "possible" | "uncertain"
 
 
 class ToolSpec(BaseModel):
@@ -72,12 +89,113 @@ class MemoryConfig(BaseModel):
     source_line: int | None = None
 
 
+# ── ASM models (V4) ────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class Provenance:
+    """Source location for an ASM node."""
+
+    file: Path
+    line: int
+    col: int
+    symbol: str  # "ClassName.method" or "function_name"
+
+
+@dataclass(frozen=True)
+class EntryPoint:
+    """An entry point into the application (route, job, CLI command)."""
+
+    id: str
+    kind: str  # "http_route", "background_job", "cli_command", "cron"
+    provenance: Provenance
+    auth: str  # "authenticated", "unauthenticated", "unknown"
+    auth_mechanism: str | None
+    user_id_source: str | None
+    confidence: ASMConfidence
+
+
+@dataclass(frozen=True)
+class WriteOp:
+    """A write operation to a vector store."""
+
+    id: str
+    provenance: Provenance
+    store_id: str  # links to Store.id
+    method: str  # "add_documents", "add_texts"
+    metadata_keys: frozenset[str]  # keys written as metadata
+    confidence: ASMConfidence
+
+
+@dataclass(frozen=True)
+class ReadOp:
+    """A read/query operation on a vector store."""
+
+    id: str
+    provenance: Provenance
+    store_id: str  # links to Store.id
+    method: str  # "similarity_search", "as_retriever"
+    filter_keys: frozenset[str]  # keys used in filter kwarg
+    has_filter: bool
+    confidence: ASMConfidence
+
+
+@dataclass(frozen=True)
+class Store:
+    """A vector store instance."""
+
+    id: str
+    provenance: Provenance
+    backend: str  # "chroma", "pgvector", "faiss"
+    collection_name: str | None
+    collection_name_is_static: bool
+    confidence: ASMConfidence
+
+
+@dataclass(frozen=True)
+class ContextSink:
+    """Where retrieved content flows (LLM prompt, API response, etc.)."""
+
+    id: str
+    provenance: Provenance
+    kind: str  # "llm_context", "api_response", "tool_input"
+    sanitized: bool
+    confidence: ASMConfidence
+
+
+@dataclass(frozen=True)
+class Edge:
+    """A directed relationship between two ASM nodes."""
+
+    source_id: str
+    target_id: str
+    kind: str  # "triggers", "writes_to", "reads_from", "guarded_by", "assembles_into"
+    confidence: ASMConfidence
+    provenance: Provenance
+
+
+@dataclass
+class ApplicationModel:
+    """Graph-based application security model."""
+
+    entry_points: list[EntryPoint] = field(default_factory=list)
+    write_ops: list[WriteOp] = field(default_factory=list)
+    stores: list[Store] = field(default_factory=list)
+    read_ops: list[ReadOp] = field(default_factory=list)
+    sinks: list[ContextSink] = field(default_factory=list)
+    edges: list[Edge] = field(default_factory=list)
+    unresolved: list[Provenance] = field(default_factory=list)
+
+
 class AgentSpec(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
+
     framework: str
     source_files: list[Path] = Field(default_factory=list)
     tools: list[ToolSpec] = Field(default_factory=list)
     memory_configs: list[MemoryConfig] = Field(default_factory=list)
     metadata: dict[str, object] = Field(default_factory=dict)
+    asm: ApplicationModel | None = None
 
 
 class ScanResult(BaseModel):
@@ -191,6 +309,7 @@ class ScanConfig:
     layers: set[str] = field(default_factory=lambda: {"L0", "L1", "L2", "L3", "L4", "L5", "L6"})
     dynamic: bool = False  # L7 — runtime instrumentation
     llm_assist: bool = False  # L8 — LLM confidence scoring
+    asm_shadow: bool = False  # ASM findings logged but not included in output
     semgrep_rules_dir: Path | None = None  # custom semgrep rules
     target: Path = field(default_factory=lambda: Path("."))
 
