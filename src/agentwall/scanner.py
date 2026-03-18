@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import warnings
 from pathlib import Path
 
 from agentwall.adapters.langchain import LangChainAdapter
+from agentwall.analyzers.asm import ASMAnalyzer
 from agentwall.analyzers.callgraph import CallGraphAnalyzer
 from agentwall.analyzers.config import ConfigAuditor
 from agentwall.analyzers.memory import MemoryAnalyzer
@@ -83,14 +85,32 @@ def _sort_findings(findings: list[Finding]) -> list[Finding]:
 
 
 def _dedup_findings(findings: list[Finding]) -> list[Finding]:
-    """Remove duplicate findings (same rule_id + file + line)."""
-    seen: set[tuple[str, str | None, int | None]] = set()
-    result: list[Finding] = []
+    """Remove duplicate findings (same rule_id + file + line).
+
+    When ASM and L1 both fire on the same location:
+    - ASM with confirmed/possible proof replaces L1
+    - L1 replaces ASM with uncertain proof
+    """
+    grouped: dict[tuple[str, str | None, int | None], list[Finding]] = {}
     for f in findings:
         key = (f.rule_id, str(f.file) if f.file else None, f.line)
-        if key not in seen:
-            seen.add(key)
-            result.append(f)
+        grouped.setdefault(key, []).append(f)
+
+    result: list[Finding] = []
+    for group in grouped.values():
+        if len(group) == 1:
+            result.append(group[0])
+            continue
+        asm = [f for f in group if f.layer == "ASM"]
+        non_asm = [f for f in group if f.layer != "ASM"]
+        if asm and non_asm:
+            best_asm = asm[0]
+            if best_asm.proof_strength in ("confirmed", "possible"):
+                result.append(best_asm)
+            else:
+                result.append(non_asm[0])
+        else:
+            result.append(group[0])
     return result
 
 
@@ -182,6 +202,22 @@ def scan(
             all_findings.extend(l6_findings)
         except Exception as exc:
             warnings.warn(f"L6 analysis failed: {exc}", stacklevel=2)
+
+    # ── ASM: Application Security Model queries ────────────────────────
+    if spec.asm is not None and not layers.issubset({"L0", "L1", "L2"}):
+        try:
+            asm_findings = ASMAnalyzer().analyze(spec.asm)
+            if config.asm_shadow:
+                logger = logging.getLogger("agentwall.asm")
+                for f in asm_findings:
+                    logger.debug(
+                        "ASM shadow: %s %s at %s:%s",
+                        f.rule_id, f.title, f.file, f.line,
+                    )
+            else:
+                all_findings.extend(asm_findings)
+        except Exception as exc:
+            warnings.warn(f"ASM analysis failed: {exc}", stacklevel=2)
 
     # ── L7: Runtime instrumentation ─────────────────────────────────────
     if config.dynamic:

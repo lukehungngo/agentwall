@@ -7,7 +7,22 @@ import warnings
 from pathlib import Path
 
 from agentwall.detector import _SKIP_DIRS
-from agentwall.models import AgentSpec, MemoryConfig, ToolSpec
+from agentwall.extractors.context_sinks import extract_context_sinks
+from agentwall.extractors.edge_linker import link_edges
+from agentwall.extractors.entry_points import extract_entry_points
+from agentwall.models import (
+    AgentSpec,
+    ApplicationModel,
+    ASMConfidence,
+    ContextSink,
+    EntryPoint,
+    MemoryConfig,
+    Provenance,
+    ReadOp,
+    Store,
+    ToolSpec,
+    WriteOp,
+)
 
 # Vector store backend names to normalised identifiers
 _VECTOR_STORES: dict[str, str] = {
@@ -90,6 +105,13 @@ class _FileVisitor(ast.NodeVisitor):
         self._retrieval_vars: set[str] = set()
         # Track whether any sanitization was observed on retrieved content
         self._has_sanitization: bool = False
+        # ASM tracking
+        self._asm_stores: list[Store] = []
+        self._asm_write_ops: list[WriteOp] = []
+        self._asm_read_ops: list[ReadOp] = []
+        self._vs_instance_store_ids: dict[str, str] = {}
+        self._store_counter: int = 0
+        self._op_counter: int = 0
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self._check_tool_decorator(node)
@@ -185,6 +207,24 @@ class _FileVisitor(ast.NodeVisitor):
             self._vs_instances[var_name] = mc
         self._vs_instances[backend] = mc  # fallback key by backend type
 
+        # Emit ASM Store node
+        coll_name_val, is_static = classify_collection_name(call)
+        store_id = self._next_store_id()
+        store_node = Store(
+            id=store_id,
+            provenance=Provenance(
+                file=self.source_file, line=lineno, col=0, symbol=class_name,
+            ),
+            backend=backend,
+            collection_name=coll_name_val,
+            collection_name_is_static=is_static,
+            confidence=ASMConfidence.CONFIRMED,
+        )
+        self._asm_stores.append(store_node)
+        if var_name:
+            self._vs_instance_store_ids[var_name] = store_id
+        self._vs_instance_store_ids[backend] = store_id
+
     def _check_memory_class_call(
         self, call: ast.Call, lineno: int, var_name: str | None = None
     ) -> None:
@@ -206,6 +246,25 @@ class _FileVisitor(ast.NodeVisitor):
     def _mark_retrieval(self, node: ast.Call, func: ast.Attribute) -> None:
         has_filter = _call_has_filter_kwarg(node)
         instance_name = _get_name(func.value)
+
+        # Emit ASM ReadOp node
+        store_id = self._find_store_id(instance_name)
+        if store_id:
+            read_id = self._next_op_id("r")
+            read_op = ReadOp(
+                id=read_id,
+                provenance=Provenance(
+                    file=self.source_file, line=node.lineno, col=node.col_offset,
+                    symbol=func.attr,
+                ),
+                store_id=store_id,
+                method=func.attr,
+                filter_keys=extract_dict_keys(node, "filter"),
+                has_filter=has_filter,
+                confidence=ASMConfidence.CONFIRMED,
+            )
+            self._asm_read_ops.append(read_op)
+
         mc = self._find_mc_by_instance(instance_name)
         if mc is None:
             return
@@ -224,6 +283,24 @@ class _FileVisitor(ast.NodeVisitor):
     def _mark_write(self, node: ast.Call, func: ast.Attribute) -> None:
         has_meta = _call_has_metadata_kwarg(node)
         instance_name = _get_name(func.value)
+
+        # Emit ASM WriteOp node
+        store_id = self._find_store_id(instance_name)
+        if store_id:
+            write_id = self._next_op_id("w")
+            write_op = WriteOp(
+                id=write_id,
+                provenance=Provenance(
+                    file=self.source_file, line=node.lineno, col=node.col_offset,
+                    symbol=func.attr,
+                ),
+                store_id=store_id,
+                method=func.attr,
+                metadata_keys=extract_dict_keys(node, "metadata"),
+                confidence=ASMConfidence.CONFIRMED,
+            )
+            self._asm_write_ops.append(write_op)
+
         mc = self._find_mc_by_instance(instance_name)
         if mc is not None and has_meta and not mc.has_metadata_on_write:
             mc_updated = mc.model_copy(update={"has_metadata_on_write": True})
@@ -262,6 +339,23 @@ class _FileVisitor(ast.NodeVisitor):
         return self._vs_instances.get(instance_name) or (
             self.memory_configs[-1] if self.memory_configs else None
         )
+
+    # ── ASM helpers ──────────────────────────────────────────────────────────
+
+    def _next_store_id(self) -> str:
+        self._store_counter += 1
+        return f"s-{self._store_counter}"
+
+    def _next_op_id(self, prefix: str) -> str:
+        self._op_counter += 1
+        return f"{prefix}-{self._op_counter}"
+
+    def _find_store_id(self, instance_name: str | None) -> str | None:
+        if instance_name and instance_name in self._vs_instance_store_ids:
+            return self._vs_instance_store_ids[instance_name]
+        if self._asm_stores:
+            return self._asm_stores[-1].id
+        return None
 
     # ── Tool(name=...) helper ─────────────────────────────────────────────────
 
@@ -463,6 +557,11 @@ class LangChainAdapter:
         )
         all_tools: list[ToolSpec] = []
         all_memory: list[MemoryConfig] = []
+        all_stores: list[Store] = []
+        all_write_ops: list[WriteOp] = []
+        all_read_ops: list[ReadOp] = []
+        all_entry_points: list[EntryPoint] = []
+        all_sinks: list[ContextSink] = []
         scanned: list[Path] = []
 
         for py_file in py_files:
@@ -489,11 +588,29 @@ class LangChainAdapter:
                 ]
             all_tools.extend(visitor.tools)
             all_memory.extend(visitor.memory_configs)
+            all_stores.extend(visitor._asm_stores)
+            all_write_ops.extend(visitor._asm_write_ops)
+            all_read_ops.extend(visitor._asm_read_ops)
+            all_entry_points.extend(extract_entry_points(tree, py_file))
+            all_sinks.extend(extract_context_sinks(tree, py_file))
             scanned.append(py_file)
+
+        asm: ApplicationModel | None = None
+        if all_stores or all_write_ops or all_read_ops or all_entry_points or all_sinks:
+            asm_model = ApplicationModel(
+                entry_points=all_entry_points,
+                write_ops=all_write_ops,
+                stores=all_stores,
+                read_ops=all_read_ops,
+                sinks=all_sinks,
+            )
+            asm_model.edges = link_edges(asm_model)
+            asm = asm_model
 
         return AgentSpec(
             framework="langchain",
             source_files=scanned,
             tools=all_tools,
             memory_configs=all_memory,
+            asm=asm,
         )

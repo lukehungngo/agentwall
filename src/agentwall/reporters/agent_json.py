@@ -59,6 +59,10 @@ def _flatten_finding(
         flat["detection_layer"] = finding.layer
     if finding.file_context:
         flat["file_context"] = finding.file_context
+    if finding.evidence_path:
+        flat["evidence_path"] = finding.evidence_path
+    if finding.proof_strength:
+        flat["proof_strength"] = finding.proof_strength
     return flat
 
 

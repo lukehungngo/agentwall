@@ -4,8 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentwall.models import ConfidenceLevel, Finding, Severity
-from agentwall.scanner import _apply_file_context, _classify_file_context, _sort_findings, scan
+from agentwall.models import Category, ConfidenceLevel, Finding, ScanConfig, Severity
+from agentwall.scanner import (
+    _apply_file_context,
+    _classify_file_context,
+    _dedup_findings,
+    _sort_findings,
+    scan,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -176,3 +182,80 @@ class TestSecondarySort:
         sorted_f = _sort_findings(findings)
         assert sorted_f[0].severity == Severity.CRITICAL
         assert sorted_f[1].severity == Severity.MEDIUM
+
+
+# ── ASM Integration ─────────────────────────────────────────────────────
+
+
+class TestASMIntegration:
+    def test_asm_findings_in_shadow_mode_not_in_output(self) -> None:
+        config = ScanConfig.default()
+        config.asm_shadow = True
+        result = scan(FIXTURES / "asm_lifecycle", config=config)
+        asm_findings = [f for f in result.findings if f.layer == "ASM"]
+        assert len(asm_findings) == 0
+
+    def test_asm_findings_included_when_not_shadow(self) -> None:
+        result = scan(FIXTURES / "asm_lifecycle")
+        asm_findings = [f for f in result.findings if f.layer == "ASM"]
+        assert len(asm_findings) >= 1
+
+    def test_fast_mode_skips_asm(self) -> None:
+        config = ScanConfig.fast()
+        result = scan(FIXTURES / "asm_lifecycle", config=config)
+        asm_findings = [f for f in result.findings if f.layer == "ASM"]
+        assert len(asm_findings) == 0
+
+    def test_asm_safe_no_tenant_isolation_findings(self) -> None:
+        result = scan(FIXTURES / "asm_safe")
+        tenant_findings = [
+            f for f in result.findings
+            if f.layer == "ASM" and f.rule_id in ("AW-MEM-001", "AW-MEM-002", "AW-MEM-003")
+        ]
+        assert len(tenant_findings) == 0
+
+    def test_existing_l1_findings_still_present(self) -> None:
+        result = scan(FIXTURES / "langchain_unsafe")
+        l1_findings = [f for f in result.findings if f.layer == "L1"]
+        assert len(l1_findings) >= 1
+
+
+# ── ASM Dedup ───────────────────────────────────────────────────────────
+
+
+class TestASMDedup:
+    def _finding(
+        self, layer: str, proof: str | None = None, line: int = 10
+    ) -> Finding:
+        return Finding(
+            rule_id="AW-MEM-001",
+            title="Test",
+            severity=Severity.CRITICAL,
+            category=Category.MEMORY,
+            description="Test",
+            file=Path("app.py"),
+            line=line,
+            layer=layer,
+            proof_strength=proof,
+            evidence_path=[{"type": "Store"}] if proof else None,
+        )
+
+    def test_asm_confirmed_replaces_l1(self) -> None:
+        l1 = self._finding("L1")
+        asm = self._finding("ASM", proof="confirmed")
+        result = _dedup_findings([l1, asm])
+        assert len(result) == 1
+        assert result[0].layer == "ASM"
+
+    def test_l1_kept_when_asm_uncertain(self) -> None:
+        l1 = self._finding("L1")
+        asm = self._finding("ASM", proof="uncertain")
+        result = _dedup_findings([l1, asm])
+        assert len(result) == 1
+        assert result[0].layer == "L1"
+
+    def test_both_kept_on_different_lines(self) -> None:
+        l1 = self._finding("L1", line=10)
+        asm = self._finding("ASM", proof="confirmed", line=20)
+        result = _dedup_findings([l1, asm])
+        assert len(result) == 2

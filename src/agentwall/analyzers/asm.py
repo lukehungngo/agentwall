@@ -101,11 +101,11 @@ class ASMAnalyzer:
         elif hasattr(node, "filter_keys"):
             detail = f"filter_keys: {set(getattr(node, 'filter_keys', set()))}"
         elif hasattr(node, "collection_name") and hasattr(node, "backend"):
-            detail = f"{getattr(node, 'backend')}, collection='{getattr(node, 'collection_name')}'"
+            detail = f"{node.backend}, collection='{node.collection_name}'"
         elif hasattr(node, "auth"):
-            detail = f"auth: {getattr(node, 'auth')}"
+            detail = f"auth: {node.auth}"
         elif hasattr(node, "sanitized"):
-            detail = f"sanitized: {getattr(node, 'sanitized')}"
+            detail = f"sanitized: {node.sanitized}"
         return {
             "type": typ,
             "file": str(prov.file) if prov else None,
@@ -150,6 +150,8 @@ class ASMAnalyzer:
         for store in model.stores:
             write_keys: set[str] = set()
             store_writes = [w for w in model.write_ops if w.store_id == store.id]
+            if not store_writes:
+                continue  # No writes to this store — mismatch check not meaningful
             for w in store_writes:
                 write_keys |= w.metadata_keys
             for r in model.read_ops:

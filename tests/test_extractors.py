@@ -5,14 +5,15 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from agentwall.extractors.context_sinks import extract_context_sinks, reset_id_counter as reset_sink_ids
+from agentwall.extractors.context_sinks import extract_context_sinks
+from agentwall.extractors.context_sinks import reset_id_counter as reset_sink_ids
 from agentwall.extractors.edge_linker import link_edges
-from agentwall.extractors.entry_points import extract_entry_points, reset_id_counter as reset_ep_ids
+from agentwall.extractors.entry_points import extract_entry_points
+from agentwall.extractors.entry_points import reset_id_counter as reset_ep_ids
 from agentwall.models import (
-    ASMConfidence,
     ApplicationModel,
+    ASMConfidence,
     ContextSink,
-    EntryPoint,
     Provenance,
     ReadOp,
     Store,

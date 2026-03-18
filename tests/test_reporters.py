@@ -680,3 +680,40 @@ class TestPatchReporter:
                 cwd="/",
             )
             assert proc.returncode == 0, f"Patch failed to apply: {proc.stdout}\n{proc.stderr}"
+
+
+# ── ASM Reporter Fields ─────────────────────────────────────────────────
+
+
+class TestASMReporterFields:
+    def _asm_finding(self) -> Finding:
+        return Finding(
+            rule_id="AW-MEM-001",
+            title="Cross-tenant reachable",
+            severity=Severity.CRITICAL,
+            category=Category.MEMORY,
+            description="Test",
+            layer="ASM",
+            evidence_path=[
+                {"type": "WriteOp", "file": "ingest.py", "line": 15, "detail": "metadata_keys: {source}"},
+                {"type": "Store", "file": "config.py", "line": 8, "detail": "chroma, collection='docs'"},
+            ],
+            proof_strength="confirmed",
+        )
+
+    def test_agent_json_includes_evidence_path(self) -> None:
+        result = _make_result([self._asm_finding()])
+        output = build_agent_json(result)
+        finding = output["findings"][0]  # type: ignore[index]
+        assert "evidence_path" in finding
+        assert len(finding["evidence_path"]) == 2  # type: ignore[arg-type]
+        assert "proof_strength" in finding
+        assert finding["proof_strength"] == "confirmed"
+
+    def test_sarif_includes_evidence_in_properties(self) -> None:
+        result = _make_result([self._asm_finding()])
+        sarif = build_sarif(result)
+        run_results = sarif["runs"][0]["results"]  # type: ignore[index]
+        props = run_results[0].get("properties", {})  # type: ignore[union-attr]
+        assert "agentwall:evidence_path" in props
+        assert "agentwall:proof_strength" in props

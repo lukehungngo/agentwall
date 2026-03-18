@@ -224,6 +224,105 @@ class TestLangChainAdapterLoadTools:
         assert spec.tools[0].description is None
 
 
+class TestASMExtraction:
+    """Test that parse() populates AgentSpec.asm."""
+
+    def test_asm_populated_on_unsafe_fixture(self, adapter: LangChainAdapter) -> None:
+        spec = adapter.parse(FIXTURES / "langchain_unsafe")
+        assert spec.asm is not None
+        assert len(spec.asm.stores) >= 1
+        assert len(spec.asm.read_ops) >= 1
+
+    def test_asm_stores_have_collection_info(self, adapter: LangChainAdapter) -> None:
+        spec = adapter.parse(FIXTURES / "langchain_unsafe")
+        assert spec.asm is not None
+        store = spec.asm.stores[0]
+        assert store.backend == "chroma"
+        assert store.collection_name == "all_users"
+        assert store.collection_name_is_static is True
+
+    def test_asm_read_op_no_filter_on_unsafe(self, adapter: LangChainAdapter) -> None:
+        spec = adapter.parse(FIXTURES / "langchain_unsafe")
+        assert spec.asm is not None
+        read = spec.asm.read_ops[0]
+        assert read.has_filter is False
+        assert read.filter_keys == frozenset()
+
+    def test_asm_safe_fixture_has_filter(self, adapter: LangChainAdapter) -> None:
+        spec = adapter.parse(FIXTURES / "langchain_safe")
+        assert spec.asm is not None
+        reads_with_filter = [r for r in spec.asm.read_ops if r.has_filter]
+        assert len(reads_with_filter) >= 1
+
+    def test_asm_safe_fixture_filter_keys(self, adapter: LangChainAdapter) -> None:
+        spec = adapter.parse(FIXTURES / "langchain_safe")
+        assert spec.asm is not None
+        filtered_read = next(r for r in spec.asm.read_ops if r.has_filter)
+        assert "user_id" in filtered_read.filter_keys
+
+    def test_asm_entry_points_on_fastapi_fixture(self, adapter: LangChainAdapter) -> None:
+        spec = adapter.parse(FIXTURES / "asm_unauth_write")
+        assert spec.asm is not None
+        assert len(spec.asm.entry_points) >= 1
+        assert spec.asm.entry_points[0].kind == "http_route"
+
+    def test_asm_write_ops_on_unauth_fixture(self, adapter: LangChainAdapter) -> None:
+        spec = adapter.parse(FIXTURES / "asm_unauth_write")
+        assert spec.asm is not None
+        assert len(spec.asm.write_ops) >= 1
+        write = spec.asm.write_ops[0]
+        assert write.method == "add_documents"
+        assert "source" in write.metadata_keys
+
+    def test_asm_edges_linked(self, adapter: LangChainAdapter) -> None:
+        spec = adapter.parse(FIXTURES / "asm_unauth_write")
+        assert spec.asm is not None
+        assert len(spec.asm.edges) >= 1
+        edge_kinds = {e.kind for e in spec.asm.edges}
+        assert "writes_to" in edge_kinds
+
+    def test_asm_none_for_empty_dir(self, adapter: LangChainAdapter, tmp_path: Path) -> None:
+        spec = adapter.parse(tmp_path)
+        assert spec.asm is None
+
+    def test_asm_none_for_no_vectorstore(self, adapter: LangChainAdapter, tmp_path: Path) -> None:
+        (tmp_path / "main.py").write_text("x = 1\n", encoding="utf-8")
+        spec = adapter.parse(tmp_path)
+        assert spec.asm is None
+
+    def test_existing_fields_unchanged(self, adapter: LangChainAdapter) -> None:
+        spec = adapter.parse(FIXTURES / "langchain_unsafe")
+        assert len(spec.tools) >= 1
+        assert len(spec.memory_configs) >= 1
+
+    def test_asm_store_ids_unique(self, adapter: LangChainAdapter, tmp_path: Path) -> None:
+        (tmp_path / "agent.py").write_text(
+            "from langchain_community.vectorstores import Chroma, FAISS\n"
+            "vs1 = Chroma(collection_name='a')\n"
+            "vs2 = FAISS()\n",
+            encoding="utf-8",
+        )
+        spec = adapter.parse(tmp_path)
+        assert spec.asm is not None
+        ids = [s.id for s in spec.asm.stores]
+        assert len(ids) == len(set(ids))
+
+    def test_asm_read_op_linked_to_correct_store(
+        self, adapter: LangChainAdapter, tmp_path: Path
+    ) -> None:
+        (tmp_path / "agent.py").write_text(
+            "from langchain_community.vectorstores import Chroma\n"
+            "vs = Chroma(collection_name='docs')\n"
+            "docs = vs.similarity_search('q')\n",
+            encoding="utf-8",
+        )
+        spec = adapter.parse(tmp_path)
+        assert spec.asm is not None
+        store = spec.asm.stores[0]
+        read = spec.asm.read_ops[0]
+        assert read.store_id == store.id
+
+
 class TestLangChainAdapterEdgeCases:
     def test_parse_error_skips_file(self, adapter: LangChainAdapter, tmp_path: Path) -> None:
         bad = tmp_path / "bad.py"

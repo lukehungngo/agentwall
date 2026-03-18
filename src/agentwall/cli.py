@@ -118,6 +118,7 @@ def scan(
     confidence: str = typer.Option(
         "all", "--confidence", help="Minimum confidence: high|medium|low|all"
     ),  # noqa: B008
+    asm_shadow: bool = typer.Option(False, "--asm-shadow", help="Run ASM in shadow mode (log but don't output)."),  # noqa: B008
 ) -> None:
     """Scan an agent directory for memory and tool security issues."""
     if not path.exists():
@@ -151,6 +152,7 @@ def scan(
 
     config.dynamic = dynamic
     config.llm_assist = llm_assist
+    config.asm_shadow = asm_shadow
 
     result = run_scan(target=path, framework=framework, config=config)
 

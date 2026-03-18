@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
-from typing import Iterator
 
 from agentwall.models import ASMConfidence, EntryPoint, Provenance
 
@@ -134,7 +133,7 @@ def _find_param_with_default(
             arg_idx = n_args - n_defaults + i
             if arg_idx < n_args:
                 return args.args[arg_idx].arg
-    for i, d in enumerate(args.kw_defaults):
-        if d is default:
+    for i, kw_default in enumerate(args.kw_defaults):
+        if kw_default is not None and kw_default is default:
             return args.kwonlyargs[i].arg
     return None

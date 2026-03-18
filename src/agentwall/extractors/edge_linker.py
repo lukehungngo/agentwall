@@ -7,7 +7,7 @@ is deferred to Phase 2.
 
 from __future__ import annotations
 
-from agentwall.models import ASMConfidence, ApplicationModel, Edge
+from agentwall.models import ApplicationModel, ASMConfidence, Edge
 
 
 def link_edges(model: ApplicationModel) -> list[Edge]:
