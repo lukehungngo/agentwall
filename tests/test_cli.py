@@ -84,6 +84,13 @@ class TestCliScan:
         )
         assert result.exit_code == 0
 
+    def test_scan_unsupported_framework_terminal_shows_no_findings(self) -> None:
+        result = runner.invoke(
+            app, ["scan", str(FIXTURES / "langchain_basic"), "--framework", "crewai", "--fail-on", "none"]
+        )
+        assert result.exit_code == 0
+        assert "No findings." in result.output
+
     def test_scan_unsupported_framework_exits_0(self) -> None:
         result = runner.invoke(
             app, ["scan", str(FIXTURES / "langchain_basic"), "--framework", "crewai", "--fail-on", "none"]

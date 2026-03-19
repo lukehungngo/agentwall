@@ -48,6 +48,9 @@ class TerminalReporter:
         )
         c.print()
 
+        for w in result.warnings:
+            c.print(f"  [yellow]{w}[/yellow]")
+
         by_sev = result.by_severity
         for sev in _SEVERITY_ORDER:
             group = by_sev.get(sev, [])
