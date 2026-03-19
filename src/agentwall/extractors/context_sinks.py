@@ -6,23 +6,12 @@ import ast
 from pathlib import Path
 
 from agentwall.models import ASMConfidence, ContextSink, Provenance
-
-_RETRIEVAL_METHODS = frozenset({
-    "similarity_search", "similarity_search_with_score",
-    "max_marginal_relevance_search", "as_retriever",
-    "get_relevant_documents",
-})
+from agentwall.patterns import RETRIEVAL_METHODS, SANITIZE_NAMES
 
 _LLM_METHODS = frozenset({
     "invoke", "ainvoke", "predict", "apredict",
     "call", "__call__", "run", "arun",
     "generate", "agenerate",
-})
-
-_SANITIZE_NAMES = frozenset({
-    "sanitize", "sanitise", "clean", "strip_tags", "escape",
-    "filter_content", "scrub", "bleach", "clean_text",
-    "sanitize_output", "sanitize_content",
 })
 
 
@@ -56,7 +45,7 @@ def extract_context_sinks(
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
             func = node.value.func
-            if isinstance(func, ast.Attribute) and func.attr in _RETRIEVAL_METHODS:
+            if isinstance(func, ast.Attribute) and func.attr in RETRIEVAL_METHODS:
                 for target in node.targets:
                     if isinstance(target, ast.Name):
                         retrieval_vars.add(target.id)
@@ -79,7 +68,7 @@ def extract_context_sinks(
         # Track sanitization
         if isinstance(node.value, ast.Call):
             func_name = _get_func_name(node.value.func)
-            if func_name and func_name.lower() in _SANITIZE_NAMES:
+            if func_name and func_name.lower() in SANITIZE_NAMES:
                 for target in node.targets:
                     if isinstance(target, ast.Name):
                         sanitized_vars.add(target.id)

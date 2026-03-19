@@ -5,7 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentwall.analyzers.asm import ASMAnalyzer
+from agentwall.context import AnalysisContext
 from agentwall.models import (
+    AgentSpec,
     ApplicationModel,
     ASMConfidence,
     ContextSink,
@@ -13,6 +15,8 @@ from agentwall.models import (
     EntryPoint,
     Provenance,
     ReadOp,
+    ScanConfig,
+    Severity,
     Store,
     WriteOp,
 )
@@ -75,6 +79,12 @@ def _edge(
     return Edge(source_id=src, target_id=tgt, kind=kind, confidence=conf, provenance=_prov())
 
 
+def _ctx(model: ApplicationModel) -> AnalysisContext:
+    ctx = AnalysisContext(target=Path("/tmp"), config=ScanConfig.default())
+    ctx.spec = AgentSpec(framework="langchain", asm=model)
+    return ctx
+
+
 # ── Proof Strength ───────────────────────────────────────────────────────
 
 
@@ -110,7 +120,7 @@ class TestQ1UnauthenticatedWrite:
             stores=[_store()],
             edges=[_edge("ep-1", "w-1", "triggers")],
         )
-        findings = ASMAnalyzer().analyze(model)
+        findings = ASMAnalyzer().analyze(_ctx(model))
         q1 = [f for f in findings if f.rule_id == "AW-MEM-003" and f.layer == "ASM"]
         assert len(q1) >= 1
         assert q1[0].proof_strength is not None
@@ -122,7 +132,7 @@ class TestQ1UnauthenticatedWrite:
             stores=[_store()],
             edges=[_edge("ep-1", "w-1", "triggers")],
         )
-        findings = ASMAnalyzer().analyze(model)
+        findings = ASMAnalyzer().analyze(_ctx(model))
         q1 = [f for f in findings if f.rule_id == "AW-MEM-003" and f.layer == "ASM"]
         assert len(q1) == 0
 
@@ -137,7 +147,7 @@ class TestQ2WriteReadKeyMismatch:
             stores=[_store()],
             read_ops=[_read(filter_keys=frozenset({"user_id"}), has_filter=True)],
         )
-        findings = ASMAnalyzer().analyze(model)
+        findings = ASMAnalyzer().analyze(_ctx(model))
         q2 = [f for f in findings if f.rule_id == "AW-MEM-002" and f.layer == "ASM"]
         assert len(q2) == 1
         assert "user_id" in q2[0].title
@@ -148,7 +158,7 @@ class TestQ2WriteReadKeyMismatch:
             stores=[_store()],
             read_ops=[_read(filter_keys=frozenset({"user_id"}), has_filter=True)],
         )
-        findings = ASMAnalyzer().analyze(model)
+        findings = ASMAnalyzer().analyze(_ctx(model))
         q2 = [f for f in findings if f.rule_id == "AW-MEM-002" and f.layer == "ASM"]
         assert len(q2) == 0
 
@@ -158,7 +168,7 @@ class TestQ2WriteReadKeyMismatch:
             stores=[_store()],
             read_ops=[_read(has_filter=False)],
         )
-        findings = ASMAnalyzer().analyze(model)
+        findings = ASMAnalyzer().analyze(_ctx(model))
         q2 = [f for f in findings if f.rule_id == "AW-MEM-002" and f.layer == "ASM"]
         assert len(q2) == 0
 
@@ -178,7 +188,7 @@ class TestQ3StaticSharedCollection:
                 _edge("ep-2", "w-2", "triggers"),
             ],
         )
-        findings = ASMAnalyzer().analyze(model)
+        findings = ASMAnalyzer().analyze(_ctx(model))
         q3 = [f for f in findings if f.rule_id == "AW-MEM-001" and f.layer == "ASM"
               and "shared" in f.title.lower()]
         assert len(q3) >= 1
@@ -194,7 +204,7 @@ class TestQ3StaticSharedCollection:
                 _edge("ep-2", "w-2", "triggers"),
             ],
         )
-        findings = ASMAnalyzer().analyze(model)
+        findings = ASMAnalyzer().analyze(_ctx(model))
         q3 = [f for f in findings if f.rule_id == "AW-MEM-001" and f.layer == "ASM"
               and "shared" in f.title.lower()]
         assert len(q3) == 0
@@ -207,7 +217,7 @@ class TestQ3StaticSharedCollection:
             read_ops=[_read(has_filter=False)],
             edges=[_edge("ep-1", "w-1", "triggers")],
         )
-        findings = ASMAnalyzer().analyze(model)
+        findings = ASMAnalyzer().analyze(_ctx(model))
         q3 = [f for f in findings if f.rule_id == "AW-MEM-001" and f.layer == "ASM"
               and "shared" in f.title.lower()]
         assert len(q3) == 0
@@ -223,7 +233,7 @@ class TestQ4CrossTenantReachable:
             stores=[_store()],
             read_ops=[_read(has_filter=False)],
         )
-        findings = ASMAnalyzer().analyze(model)
+        findings = ASMAnalyzer().analyze(_ctx(model))
         q4 = [f for f in findings if "Cross-tenant" in f.title and f.layer == "ASM"]
         assert len(q4) >= 1
 
@@ -233,7 +243,7 @@ class TestQ4CrossTenantReachable:
             stores=[_store()],
             read_ops=[_read(has_filter=False)],
         )
-        findings = ASMAnalyzer().analyze(model)
+        findings = ASMAnalyzer().analyze(_ctx(model))
         q4 = [f for f in findings if "Cross-tenant" in f.title and f.layer == "ASM"]
         assert len(q4) == 0
 
@@ -243,7 +253,7 @@ class TestQ4CrossTenantReachable:
             stores=[_store()],
             read_ops=[_read(filter_keys=frozenset({"user_id"}), has_filter=True)],
         )
-        findings = ASMAnalyzer().analyze(model)
+        findings = ASMAnalyzer().analyze(_ctx(model))
         q4 = [f for f in findings if "Cross-tenant" in f.title and f.layer == "ASM"]
         assert len(q4) == 0
 
@@ -267,7 +277,7 @@ class TestQ4CrossTenantReachable:
                 _edge("r-1", "sink-1", "assembles_into"),
             ],
         )
-        findings = ASMAnalyzer().analyze(model)
+        findings = ASMAnalyzer().analyze(_ctx(model))
         q4 = [f for f in findings if "Cross-tenant" in f.title and f.layer == "ASM"]
         assert len(q4) == 1
         path = q4[0].evidence_path
@@ -292,7 +302,7 @@ class TestQ5UnsanitizedContext:
             sinks=[_sink()],
             edges=[_edge("r-1", "sink-1", "assembles_into", ASMConfidence.INFERRED)],
         )
-        findings = ASMAnalyzer().analyze(model)
+        findings = ASMAnalyzer().analyze(_ctx(model))
         q5 = [f for f in findings if f.rule_id == "AW-MEM-005" and f.layer == "ASM"]
         assert len(q5) == 1
 
@@ -307,7 +317,7 @@ class TestQ5UnsanitizedContext:
             sinks=[sink],
             edges=[_edge("r-1", "sink-1", "assembles_into")],
         )
-        findings = ASMAnalyzer().analyze(model)
+        findings = ASMAnalyzer().analyze(_ctx(model))
         q5 = [f for f in findings if f.rule_id == "AW-MEM-005" and f.layer == "ASM"]
         assert len(q5) == 0
 
@@ -337,12 +347,67 @@ class TestQ3Q4Interaction:
                 _edge("ep-1", "r-1", "triggers"),
             ],
         )
-        findings = ASMAnalyzer().analyze(model)
+        findings = ASMAnalyzer().analyze(_ctx(model))
         rule_ids = {f.rule_id for f in findings}
         assert "AW-MEM-001" in rule_ids, "Q3 or Q4 should fire AW-MEM-001"
         # Both Q3 and Q4 emit AW-MEM-001 — expect at least 2
         mem001 = [f for f in findings if f.rule_id == "AW-MEM-001"]
         assert len(mem001) >= 2, f"Expected Q3+Q4 both firing, got {len(mem001)}"
+
+
+# ── Severity Capping ────────────────────────────────────────────────────
+
+
+class TestSeverityCapping:
+    def test_critical_possible_caps_to_high(self) -> None:
+        ana = ASMAnalyzer()
+        assert ana._cap_severity(Severity.CRITICAL, "possible") == Severity.HIGH
+
+    def test_critical_uncertain_caps_to_medium(self) -> None:
+        ana = ASMAnalyzer()
+        assert ana._cap_severity(Severity.CRITICAL, "uncertain") == Severity.MEDIUM
+
+    def test_high_uncertain_caps_to_medium(self) -> None:
+        ana = ASMAnalyzer()
+        assert ana._cap_severity(Severity.HIGH, "uncertain") == Severity.MEDIUM
+
+    def test_high_confirmed_stays_high(self) -> None:
+        ana = ASMAnalyzer()
+        assert ana._cap_severity(Severity.HIGH, "confirmed") == Severity.HIGH
+
+    def test_medium_possible_stays_medium(self) -> None:
+        ana = ASMAnalyzer()
+        assert ana._cap_severity(Severity.MEDIUM, "possible") == Severity.MEDIUM
+
+
+# ── Q4: Evidence includes all unscoped writes and unfiltered reads ──────
+
+
+class TestQ4EvidenceAggregation:
+    def test_evidence_includes_all_unscoped_writes_and_unfiltered_reads(self) -> None:
+        ep_w = _entry(id="ep-1", auth="unknown")
+        w1 = _write(id="w-1", keys=frozenset({"source"}))
+        w2 = _write(id="w-2", keys=frozenset({"filename"}))
+        w3 = _write(id="w-3", keys=frozenset({"tag"}))
+        r1 = _read(id="r-1", has_filter=False)
+        r2 = _read(id="r-2", has_filter=False)
+        store = _store()
+        model = ApplicationModel(
+            entry_points=[ep_w],
+            write_ops=[w1, w2, w3],
+            stores=[store],
+            read_ops=[r1, r2],
+            edges=[_edge("ep-1", "w-1", "triggers")],
+        )
+        findings = ASMAnalyzer().analyze(_ctx(model))
+        q4 = [f for f in findings if "Cross-tenant" in f.title and f.layer == "ASM"]
+        assert len(q4) == 1
+        path = q4[0].evidence_path
+        assert path is not None
+        write_nodes = [n for n in path if n["type"] == "WriteOp"]
+        read_nodes = [n for n in path if n["type"] == "ReadOp"]
+        assert len(write_nodes) == 3, f"Expected 3 unscoped writes, got {len(write_nodes)}"
+        assert len(read_nodes) == 2, f"Expected 2 unfiltered reads, got {len(read_nodes)}"
 
 
 class TestASMSafe:
@@ -368,5 +433,5 @@ class TestASMSafe:
                 _edge("r-1", "sink-1", "assembles_into"),
             ],
         )
-        findings = ASMAnalyzer().analyze(model)
+        findings = ASMAnalyzer().analyze(_ctx(model))
         assert len(findings) == 0

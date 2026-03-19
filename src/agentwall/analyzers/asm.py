@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
+from agentwall.context import AnalysisContext
 from agentwall.models import (
     ApplicationModel,
     ASMConfidence,
@@ -10,6 +13,7 @@ from agentwall.models import (
     Finding,
     Severity,
 )
+from agentwall.patterns import TENANT_KEYS
 from agentwall.rules import AW_MEM_001, AW_MEM_002, AW_MEM_003, AW_MEM_005
 
 _SEVERITY_RANK: dict[Severity, int] = {
@@ -32,13 +36,19 @@ _CONFIDENCE_MAP: dict[str, ConfidenceLevel] = {
     "uncertain": ConfidenceLevel.LOW,
 }
 
-_TENANT_KEYS = frozenset({"user_id", "tenant_id", "org_id", "owner_id"})
-
 
 class ASMAnalyzer:
     """Run graph queries against an ApplicationModel."""
 
-    def analyze(self, model: ApplicationModel) -> list[Finding]:
+    name: str = "ASM"
+    depends_on: Sequence[str] = ("L2",)
+    replace: bool = False
+    opt_in: bool = False
+
+    def analyze(self, ctx: AnalysisContext) -> list[Finding]:
+        model = ctx.spec.asm if ctx.spec else None
+        if model is None:
+            return []
         findings: list[Finding] = []
         findings.extend(self._q1_unauthenticated_write(model))
         findings.extend(self._q2_write_read_key_mismatch(model))
@@ -240,20 +250,22 @@ class ASMAnalyzer:
         for store in model.stores:
             writes = [w for w in model.write_ops if w.store_id == store.id]
             reads = [r for r in model.read_ops if r.store_id == store.id]
-            # One finding per store — pick first unscoped write + first unfiltered read
-            unscoped_write = next(
-                (w for w in writes if not (w.metadata_keys & _TENANT_KEYS)), None,
-            )
-            unfiltered_read = next(
-                (r for r in reads if not r.has_filter), None,
-            )
-            if unscoped_write and unfiltered_read:
-                # Build full evidence path: entry_w → write → store → read → entry_r → sink
-                entry_w = self._find_triggering_ep(model, unscoped_write.id)
-                entry_r = self._find_triggering_ep(model, unfiltered_read.id)
-                sink = self._find_sink_for_read(model, unfiltered_read.id)
-                nodes: list[object] = [
-                    n for n in [entry_w, unscoped_write, store, unfiltered_read, entry_r, sink]
+            unscoped_writes = [w for w in writes if not (w.metadata_keys & TENANT_KEYS)]
+            unfiltered_reads = [r for r in reads if not r.has_filter]
+            if unscoped_writes and unfiltered_reads:
+                # proof_strength from first pair + entry/sink
+                first_write = unscoped_writes[0]
+                first_read = unfiltered_reads[0]
+                entry_w = self._find_triggering_ep(model, first_write.id)
+                entry_r = self._find_triggering_ep(model, first_read.id)
+                sink = self._find_sink_for_read(model, first_read.id)
+                evidence_nodes: list[object] = [
+                    n for n in [entry_w, first_write, store, first_read, entry_r, sink]
+                    if n is not None
+                ]
+                # evidence_path: all unscoped writes and all unfiltered reads
+                path_nodes: list[object] = [
+                    n for n in [entry_w, *unscoped_writes, store, *unfiltered_reads, entry_r, sink]
                     if n is not None
                 ]
                 findings.append(self._make_finding(
@@ -265,8 +277,8 @@ class ASMAnalyzer:
                         "and retrieved without a filter. Any user's query returns any user's data."
                     ),
                     fix="Add user_id to metadata at write time AND filter on user_id at read time.",
-                    evidence_nodes=nodes,
-                    evidence_path=[self._serialize_node(n) for n in nodes],
+                    evidence_nodes=evidence_nodes,
+                    evidence_path=[self._serialize_node(n) for n in path_nodes],
                 ))
         return findings
 

@@ -1,116 +1,92 @@
-"""Scanner orchestrator — ties together all analysis layers."""
+"""Scanner orchestrator — registry-driven analysis pipeline."""
 
 from __future__ import annotations
 
 import logging
 import warnings
+from collections import deque
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from agentwall.adapters.langchain import LangChainAdapter
-from agentwall.analyzers.asm import ASMAnalyzer
-from agentwall.analyzers.callgraph import CallGraphAnalyzer
-from agentwall.analyzers.config import ConfigAuditor
-from agentwall.analyzers.memory import MemoryAnalyzer
-from agentwall.analyzers.semgrep import SemgrepAnalyzer
-from agentwall.analyzers.symbolic import SymbolicAnalyzer
-from agentwall.analyzers.taint import TaintAnalyzer
-from agentwall.analyzers.tools import ToolAnalyzer
+from agentwall.analyzers import ANALYZERS
+from agentwall.context import AnalysisContext
 from agentwall.detector import auto_detect_framework
-from agentwall.models import (
-    CONFIDENCE_RANK,
-    ConfidenceLevel,
-    Finding,
-    ScanConfig,
-    ScanResult,
-    Severity,
-)
+from agentwall.models import Finding, ScanConfig, ScanResult
+from agentwall.postprocess import apply_file_context, dedup, sort
 
-_SEVERITY_RANK: dict[Severity, int] = {
-    Severity.CRITICAL: 0,
-    Severity.HIGH: 1,
-    Severity.MEDIUM: 2,
-    Severity.LOW: 3,
-    Severity.INFO: 4,
-}
+if TYPE_CHECKING:
+    from agentwall.context import Analyzer
 
-# Directory components that indicate test context
-_TEST_DIRS = frozenset({"tests", "test"})
-# Directory components that indicate example/docs context
-_EXAMPLE_DIRS = frozenset({"examples", "example", "docs"})
+logger = logging.getLogger(__name__)
 
 
-def _classify_file_context(file_path: Path | None) -> str | None:
-    """Classify a file path as test/example context, or None."""
-    if file_path is None:
-        return None
-    name = file_path.name
-    parts = file_path.parts
-
-    # Test file: directory is tests/test, or filename starts with test_ or ends with _test.py
-    if (
-        any(p in _TEST_DIRS for p in parts)
-        or name.startswith("test_")
-        or name.endswith("_test.py")
-    ):
-        return "test file"
-
-    # Example/docs: directory is examples/example/docs, or filename ends with .example
-    if any(p in _EXAMPLE_DIRS for p in parts) or name.endswith(".example"):
-        return "example"
-
-    return None
+def _layer_group(name: str) -> str:
+    """Map analyzer name to its layer group: 'L1-memory' → 'L1', 'ASM' → 'ASM'."""
+    return name.split("-")[0]
 
 
-def _apply_file_context(findings: list[Finding]) -> list[Finding]:
-    """Tag findings with file context and cap confidence for test/example files."""
-    result: list[Finding] = []
-    for f in findings:
-        ctx = _classify_file_context(f.file)
-        if ctx is not None:
-            updates: dict[str, object] = {"file_context": ctx}
-            # Cap confidence at LOW for test/example files
-            if f.confidence != ConfidenceLevel.LOW:
-                updates["confidence"] = ConfidenceLevel.LOW
-            result.append(f.model_copy(update=updates))
-        else:
-            result.append(f)
-    return result
+def _resolve_order(
+    analyzers: list[type[Analyzer]],
+    enabled: set[str],
+) -> list[type[Analyzer]]:
+    """Topologically sort analyzers by depends_on, filtering by enabled layers.
 
-
-def _sort_findings(findings: list[Finding]) -> list[Finding]:
-    return sorted(
-        findings,
-        key=lambda f: (_SEVERITY_RANK[f.severity], CONFIDENCE_RANK[f.confidence]),
-    )
-
-
-def _dedup_findings(findings: list[Finding]) -> list[Finding]:
-    """Remove duplicate findings (same rule_id + file + line).
-
-    When ASM and L1 both fire on the same location:
-    - ASM with confirmed/possible proof replaces L1
-    - L1 replaces ASM with uncertain proof
+    Auto-includes transitive dependencies: if L3 is enabled and depends on L2,
+    L2 is included even if not explicitly in ``enabled``.
     """
-    grouped: dict[tuple[str, str | None, int | None], list[Finding]] = {}
-    for f in findings:
-        key = (f.rule_id, str(f.file) if f.file else None, f.line)
-        grouped.setdefault(key, []).append(f)
+    by_name: dict[str, type[Analyzer]] = {a.name: a for a in analyzers}
 
-    result: list[Finding] = []
-    for group in grouped.values():
-        if len(group) == 1:
-            result.append(group[0])
-            continue
-        asm = [f for f in group if f.layer == "ASM"]
-        non_asm = [f for f in group if f.layer != "ASM"]
-        if asm and non_asm:
-            best_asm = asm[0]
-            if best_asm.proof_strength in ("confirmed", "possible"):
-                result.append(best_asm)
-            else:
-                result.append(non_asm[0])
-        else:
-            result.append(group[0])
+    # Expand enabled set to include transitive dependencies
+    expanded: set[str] = set()
+
+    def _expand(name: str) -> None:
+        if name in expanded:
+            return
+        expanded.add(name)
+        if name in by_name:
+            for dep in by_name[name].depends_on:
+                _expand(dep)
+
+    for name, cls in by_name.items():
+        group = _layer_group(name)
+        if getattr(cls, "opt_in", False):
+            # opt-in analyzers only run when explicitly enabled
+            if name in enabled or group in enabled:
+                _expand(name)
+        elif group in enabled or name in enabled:
+            _expand(name)
+
+    # ASM runs whenever layers go beyond L0-L2 (matches pre-refactor behavior)
+    if "ASM" in by_name and not enabled.issubset({"L0", "L1", "L2"}):
+        _expand("ASM")
+
+    # Filter to expanded set
+    filtered = [a for a in analyzers if a.name in expanded]
+
+    # Topological sort (Kahn's algorithm)
+    in_degree: dict[str, int] = {a.name: 0 for a in filtered}
+    for a in filtered:
+        for dep in a.depends_on:
+            if dep in in_degree:
+                in_degree[a.name] += 1
+
+    queue = deque(a for a in filtered if in_degree[a.name] == 0)
+    result: list[type[Analyzer]] = []
+    while queue:
+        node = queue.popleft()
+        result.append(node)
+        for a in filtered:
+            if node.name in a.depends_on and a.name in in_degree:
+                in_degree[a.name] -= 1
+                if in_degree[a.name] == 0:
+                    queue.append(a)
+
+    if len(result) != len(filtered):
+        missing = {a.name for a in filtered} - {a.name for a in result}
+        msg = f"Dependency cycle detected among analyzers: {sorted(missing)}"
+        raise ValueError(msg)
+
     return result
 
 
@@ -135,7 +111,11 @@ def scan(
     if config is None:
         config = ScanConfig.default()
 
-    layers = config.layers
+    layers = set(config.layers)
+    if config.dynamic:
+        layers.add("L7")
+    if config.llm_assist:
+        layers.add("L8")
 
     # ── L0: Framework detection ──────────────────────────────────────────
     detected = framework or auto_detect_framework(target)
@@ -147,108 +127,71 @@ def scan(
             errors=[f"Unsupported or undetected framework: {detected!r}"],
         )
 
-    # ── L1: Single-file AST analysis ────────────────────────────────────
+    # ── Parse (adapter produces AgentSpec including ASM) ─────────────────
     adapter = LangChainAdapter()
     spec = adapter.parse(target)
 
-    all_findings: list[Finding] = []
+    ctx = AnalysisContext(target=target, config=config, spec=spec)
 
-    if "L1" in layers:
-        memory_findings = MemoryAnalyzer().analyze(spec)
-        tool_findings = ToolAnalyzer().analyze(spec)
-        # Tag L1 findings
-        for f in memory_findings + tool_findings:
-            if f.layer is None:
-                all_findings.append(f.model_copy(update={"layer": "L1"}))
-            else:
-                all_findings.append(f)
+    # ── Run analyzers in dependency order ─────────────────────────────────
+    ordered = _resolve_order(ANALYZERS, layers)
 
-    # ── L2: Call graph analysis ──────────────────────────────────────────
-    if "L2" in layers and spec.source_files:
-        try:
-            l2 = CallGraphAnalyzer()
-            all_findings = l2.analyze(spec, list(all_findings), target)
-        except Exception as exc:
-            warnings.warn(f"L2 analysis failed: {exc}", stacklevel=2)
+    shadow = config.shadow_layers | ({"ASM"} if config.asm_shadow else set())
 
-    # ── L3: Taint analysis ──────────────────────────────────────────────
-    if "L3" in layers and spec.source_files:
-        try:
-            l3_findings = TaintAnalyzer().analyze(spec)
-            all_findings.extend(l3_findings)
-        except Exception as exc:
-            warnings.warn(f"L3 analysis failed: {exc}", stacklevel=2)
+    for analyzer_cls in ordered:
+        group = _layer_group(analyzer_cls.name)
 
-    # ── L4: Config auditing ─────────────────────────────────────────────
-    if "L4" in layers:
-        try:
-            config_findings = ConfigAuditor().analyze(target)
-            all_findings.extend(config_findings)
-        except Exception as exc:
-            warnings.warn(f"L4 analysis failed: {exc}", stacklevel=2)
-
-    # ── L5: Semgrep rules ───────────────────────────────────────────────
-    if "L5" in layers:
-        try:
-            l5 = SemgrepAnalyzer(custom_rules_dir=config.semgrep_rules_dir)
-            all_findings.extend(l5.analyze(target))
-        except Exception as exc:
-            warnings.warn(f"L5 analysis failed: {exc}", stacklevel=2)
-
-    # ── L6: Symbolic analysis ───────────────────────────────────────────
-    if "L6" in layers and spec.source_files:
-        try:
-            l6_findings = SymbolicAnalyzer().analyze(spec)
-            all_findings.extend(l6_findings)
-        except Exception as exc:
-            warnings.warn(f"L6 analysis failed: {exc}", stacklevel=2)
-
-    # ── ASM: Application Security Model queries ────────────────────────
-    # Run ASM when the model was built AND at least one layer beyond L0-L2 is
-    # enabled (ASM graph queries need the richer analysis context).
-    if spec.asm is not None and not layers.issubset({"L0", "L1", "L2"}):
-        try:
-            asm_findings = ASMAnalyzer().analyze(spec.asm)
-            if config.asm_shadow:
-                logger = logging.getLogger("agentwall.asm")
-                for f in asm_findings:
-                    logger.debug(
-                        "ASM shadow: %s %s at %s:%s",
-                        f.rule_id, f.title, f.file, f.line,
+        # Shadow mode: run but suppress output
+        if analyzer_cls.name in shadow:
+            try:
+                shadow_findings = analyzer_cls().analyze(ctx)
+                shadow_logger = logging.getLogger(f"agentwall.{analyzer_cls.name.lower()}")
+                for f in shadow_findings:
+                    shadow_logger.debug(
+                        "%s shadow: %s %s at %s:%s",
+                        analyzer_cls.name, f.rule_id, f.title, f.file, f.line,
                     )
+            except Exception as exc:
+                msg = f"{analyzer_cls.name} analysis failed: {exc}"
+                warnings.warn(msg, stacklevel=2)
+                ctx.errors.append(msg)
+            continue
+
+        try:
+            findings = analyzer_cls().analyze(ctx)
+            if analyzer_cls.replace:
+                # Refinement layer — replaces rather than extends
+                ctx.findings = findings
             else:
-                all_findings.extend(asm_findings)
+                _collect_findings(ctx, findings, group)
         except Exception as exc:
-            warnings.warn(f"ASM analysis failed: {exc}", stacklevel=2)
+            msg = f"{analyzer_cls.name} analysis failed: {exc}"
+            warnings.warn(msg, stacklevel=2)
+            ctx.errors.append(msg)
+            logger.warning(msg)
 
-    # ── L7: Runtime instrumentation ─────────────────────────────────────
-    if config.dynamic:
-        try:
-            from agentwall.runtime.patcher import run_with_instrumentation
-
-            report = run_with_instrumentation(target)
-            all_findings.extend(report.to_findings())
-        except Exception as exc:
-            warnings.warn(f"L7 runtime analysis failed: {exc}", stacklevel=2)
-
-    # ── L8: LLM confidence scoring ──────────────────────────────────────
-    if config.llm_assist:
-        try:
-            from agentwall.analyzers.confidence import ConfidenceScorer
-
-            scorer = ConfidenceScorer(allow_local_llm=True, allow_api=False)
-            all_findings = scorer.apply_scores(all_findings)
-        except Exception as exc:
-            warnings.warn(f"L8 confidence scoring failed: {exc}", stacklevel=2)
-
-    # ── Finalize ────────────────────────────────────────────────────────
-    all_findings = _dedup_findings(all_findings)
-    all_findings = _apply_file_context(all_findings)
-    all_findings = _sort_findings(all_findings)
+    # ── Finalize ─────────────────────────────────────────────────────────
+    all_findings = dedup(ctx.findings)
+    all_findings = apply_file_context(all_findings)
+    all_findings = sort(all_findings)
 
     return ScanResult(
         target=target,
         framework=detected,
         findings=all_findings,
         scanned_files=len(spec.source_files),
+        errors=ctx.errors,
     )
+
+
+def _collect_findings(
+    ctx: AnalysisContext,
+    findings: list[Finding],
+    layer_group: str,
+) -> None:
+    """Add findings to context, tagging with layer if not already tagged."""
+    for f in findings:
+        if f.layer is None:
+            ctx.findings.append(f.model_copy(update={"layer": layer_group}))
+        else:
+            ctx.findings.append(f)

@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import ast
 import warnings
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from agentwall.context import AnalysisContext
 from agentwall.models import (
-    AgentSpec,
     Category,
     ConfidenceLevel,
     Finding,
@@ -21,41 +22,7 @@ from agentwall.models import (
     TaintSink,
     TaintSource,
 )
-
-# ── Sources: where user identity enters the system ──────────────────────────
-
-_SOURCE_PATTERNS = [
-    # Attribute access patterns
-    "request.user",
-    "request.user_id",
-    "request.headers",
-    "session.user_id",
-    "session.user",
-    "g.user",
-    "current_user",
-    "auth.user",
-    # Common parameter names
-    "user_id",
-    "tenant_id",
-    "org_id",
-    "owner_id",
-    "user",
-    "tenant",
-    "owner",
-]
-
-_SIMPLE_SOURCE_NAMES = frozenset(s for s in _SOURCE_PATTERNS if "." not in s)
-
-# ── Sinks: where user identity should reach ─────────────────────────────────
-
-_SINK_METHODS = {
-    "similarity_search": "filter",
-    "similarity_search_with_score": "filter",
-    "max_marginal_relevance_search": "filter",
-    "as_retriever": "search_kwargs",
-    "get_relevant_documents": "filter",
-    # NOTE: "query" excluded — too generic, matches SQLAlchemy/FastAPI/etc.
-}
+from agentwall.patterns import SIMPLE_SOURCE_NAMES, SINK_METHODS, SOURCE_PATTERNS
 
 
 @dataclass
@@ -108,7 +75,7 @@ class _TaintVisitor(ast.NodeVisitor):
     def _check_params_for_sources(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
         """Mark function parameters named user_id, tenant_id, etc. as tainted."""
         for arg in node.args.args:
-            if arg.arg.lower() in _SIMPLE_SOURCE_NAMES:
+            if arg.arg.lower() in SIMPLE_SOURCE_NAMES:
                 self.state.tainted_vars.add(arg.arg)
                 src = TaintSource(
                     name=arg.arg,
@@ -144,8 +111,8 @@ class _TaintVisitor(ast.NodeVisitor):
     def visit_Call(self, node: ast.Call) -> None:
         """Check if tainted data reaches a sink (filter kwarg)."""
         func = node.func
-        if isinstance(func, ast.Attribute) and func.attr in _SINK_METHODS:
-            expected_kwarg = _SINK_METHODS[func.attr]
+        if isinstance(func, ast.Attribute) and func.attr in SINK_METHODS:
+            expected_kwarg = SINK_METHODS[func.attr]
             kwarg_found = False
             for kw in node.keywords:
                 if kw.arg == expected_kwarg:
@@ -216,7 +183,7 @@ class _TaintVisitor(ast.NodeVisitor):
         src = self._expr_to_str(node)
         if not src:
             return False
-        return any(src.endswith(pat) or pat.endswith(src) for pat in _SOURCE_PATTERNS)
+        return any(src.endswith(pat) or pat.endswith(src) for pat in SOURCE_PATTERNS)
 
     def _expr_to_str(self, node: ast.expr) -> str | None:
         """Convert simple attribute access to dotted string."""
@@ -232,8 +199,19 @@ class _TaintVisitor(ast.NodeVisitor):
 class TaintAnalyzer:
     """L3 analyzer: track user identity flow from source to sink."""
 
-    def analyze(self, spec: AgentSpec) -> list[Finding]:
+    name: str = "L3"
+    depends_on: Sequence[str] = ("L2",)
+    replace: bool = False
+    opt_in: bool = False
+
+    def analyze(self, ctx: AnalysisContext) -> list[Finding]:
         """Run taint analysis across all source files."""
+        spec = ctx.spec
+        if spec is None:
+            return []
+
+        _call_graph = ctx.call_graph  # available for cross-file taint (v1.0)  # noqa: F841
+
         findings: list[Finding] = []
 
         all_sources: list[TaintSource] = []
@@ -329,5 +307,8 @@ class TaintAnalyzer:
                         layer="L3",
                     )
                 )
+
+        # Write taint results to context for downstream analyzers (L6)
+        ctx.taint_results = all_flows
 
         return findings

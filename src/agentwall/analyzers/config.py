@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Sequence
 from pathlib import Path
 
+from agentwall.context import AnalysisContext
 from agentwall.models import Category, Finding, Severity
 
 # Directories to skip during config file search
@@ -128,7 +130,13 @@ def _should_skip(path: Path, target: Path) -> bool:
 class ConfigAuditor:
     """Scans configuration files for insecure vector store and infrastructure settings."""
 
-    def analyze(self, target: Path) -> list[Finding]:
+    name: str = "L4"
+    depends_on: Sequence[str] = ()
+    replace: bool = False
+    opt_in: bool = False
+
+    def analyze(self, ctx: AnalysisContext) -> list[Finding]:
+        target = ctx.target
         findings: list[Finding] = []
         for config_file in self._find_config_files(target):
             findings.extend(self._audit_file(config_file))

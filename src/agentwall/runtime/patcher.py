@@ -27,6 +27,7 @@ from types import ModuleType
 from typing import Any
 
 from agentwall.models import Category, ConfidenceLevel, Finding, Severity
+from agentwall.patterns import FILTER_KWARGS
 
 logger = logging.getLogger("agentwall.runtime")
 
@@ -47,7 +48,6 @@ _PATCH_TARGETS: dict[str, list[str]] = {
     "langchain_community.vectorstores.redis": ["similarity_search"],
 }
 
-_FILTER_KWARGS = frozenset(["filter", "where", "where_document"])
 
 
 @dataclass
@@ -118,7 +118,7 @@ def _make_wrapper(
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         _report.total_calls += 1
 
-        has_filter = any(k in kwargs for k in _FILTER_KWARGS)
+        has_filter = any(k in kwargs for k in FILTER_KWARGS)
         if "search_kwargs" in kwargs:
             sk = kwargs["search_kwargs"]
             if isinstance(sk, dict) and "filter" in sk:

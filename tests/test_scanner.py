@@ -5,13 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentwall.models import Category, ConfidenceLevel, Finding, ScanConfig, Severity
-from agentwall.scanner import (
-    _apply_file_context,
-    _classify_file_context,
-    _dedup_findings,
-    _sort_findings,
-    scan,
+from agentwall.postprocess import (
+    apply_file_context,
+    classify_file_context,
+    dedup,
+    sort,
 )
+from agentwall.scanner import scan
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -68,44 +68,44 @@ class TestScannerFrameworkOverride:
 
 class TestFileContextClassification:
     def test_test_directory(self) -> None:
-        assert _classify_file_context(Path("tests/test_agent.py")) == "test file"
+        assert classify_file_context(Path("tests/test_agent.py")) == "test file"
 
     def test_test_prefix(self) -> None:
-        assert _classify_file_context(Path("src/test_utils.py")) == "test file"
+        assert classify_file_context(Path("src/test_utils.py")) == "test file"
 
     def test_test_suffix(self) -> None:
-        assert _classify_file_context(Path("src/agent_test.py")) == "test file"
+        assert classify_file_context(Path("src/agent_test.py")) == "test file"
 
     def test_example_directory(self) -> None:
-        assert _classify_file_context(Path("examples/demo.py")) == "example"
+        assert classify_file_context(Path("examples/demo.py")) == "example"
 
     def test_example_extension(self) -> None:
-        assert _classify_file_context(Path("config.example")) == "example"
+        assert classify_file_context(Path("config.example")) == "example"
 
     def test_docs_directory(self) -> None:
-        assert _classify_file_context(Path("docs/guide.py")) == "example"
+        assert classify_file_context(Path("docs/guide.py")) == "example"
 
     def test_production_file(self) -> None:
-        assert _classify_file_context(Path("src/agent.py")) is None
+        assert classify_file_context(Path("src/agent.py")) is None
 
     def test_none_path(self) -> None:
-        assert _classify_file_context(None) is None
+        assert classify_file_context(None) is None
 
     # Negative cases — production files must NOT be classified
     def test_contest_handler_not_test(self) -> None:
-        assert _classify_file_context(Path("src/contest_handler.py")) is None
+        assert classify_file_context(Path("src/contest_handler.py")) is None
 
     def test_latest_config_not_test(self) -> None:
-        assert _classify_file_context(Path("src/latest_config.py")) is None
+        assert classify_file_context(Path("src/latest_config.py")) is None
 
     def test_backtest_not_test(self) -> None:
-        assert _classify_file_context(Path("src/backtest.py")) is None
+        assert classify_file_context(Path("src/backtest.py")) is None
 
     def test_protest_not_test(self) -> None:
-        assert _classify_file_context(Path("src/protest_handler.py")) is None
+        assert classify_file_context(Path("src/protest_handler.py")) is None
 
     def test_example_utils_not_example(self) -> None:
-        assert _classify_file_context(Path("src/example_utils.py")) is None
+        assert classify_file_context(Path("src/example_utils.py")) is None
 
 
 class TestConfidenceCapping:
@@ -128,24 +128,24 @@ class TestConfidenceCapping:
 
     def test_caps_test_file_to_low(self) -> None:
         f = self._make_finding(file=Path("tests/test_agent.py"), confidence=ConfidenceLevel.HIGH)
-        result = _apply_file_context([f])
+        result = apply_file_context([f])
         assert result[0].confidence == ConfidenceLevel.LOW
         assert result[0].file_context == "test file"
 
     def test_caps_example_to_low(self) -> None:
         f = self._make_finding(file=Path("examples/demo.py"), confidence=ConfidenceLevel.MEDIUM)
-        result = _apply_file_context([f])
+        result = apply_file_context([f])
         assert result[0].confidence == ConfidenceLevel.LOW
         assert result[0].file_context == "example"
 
     def test_keeps_low_as_low(self) -> None:
         f = self._make_finding(file=Path("tests/test_agent.py"), confidence=ConfidenceLevel.LOW)
-        result = _apply_file_context([f])
+        result = apply_file_context([f])
         assert result[0].confidence == ConfidenceLevel.LOW
 
     def test_no_cap_for_production(self) -> None:
         f = self._make_finding(file=Path("src/agent.py"), confidence=ConfidenceLevel.HIGH)
-        result = _apply_file_context([f])
+        result = apply_file_context([f])
         assert result[0].confidence == ConfidenceLevel.HIGH
         assert result[0].file_context is None
 
@@ -169,7 +169,7 @@ class TestSecondarySort:
             self._make_finding(Severity.HIGH, ConfidenceLevel.HIGH),
             self._make_finding(Severity.HIGH, ConfidenceLevel.MEDIUM),
         ]
-        sorted_f = _sort_findings(findings)
+        sorted_f = sort(findings)
         assert sorted_f[0].confidence == ConfidenceLevel.HIGH
         assert sorted_f[1].confidence == ConfidenceLevel.MEDIUM
         assert sorted_f[2].confidence == ConfidenceLevel.LOW
@@ -179,7 +179,7 @@ class TestSecondarySort:
             self._make_finding(Severity.MEDIUM, ConfidenceLevel.HIGH),
             self._make_finding(Severity.CRITICAL, ConfidenceLevel.LOW),
         ]
-        sorted_f = _sort_findings(findings)
+        sorted_f = sort(findings)
         assert sorted_f[0].severity == Severity.CRITICAL
         assert sorted_f[1].severity == Severity.MEDIUM
 
@@ -243,19 +243,133 @@ class TestASMDedup:
     def test_asm_confirmed_replaces_l1(self) -> None:
         l1 = self._finding("L1")
         asm = self._finding("ASM", proof="confirmed")
-        result = _dedup_findings([l1, asm])
+        result = dedup([l1, asm])
         assert len(result) == 1
         assert result[0].layer == "ASM"
 
     def test_l1_kept_when_asm_uncertain(self) -> None:
         l1 = self._finding("L1")
         asm = self._finding("ASM", proof="uncertain")
-        result = _dedup_findings([l1, asm])
+        result = dedup([l1, asm])
         assert len(result) == 1
         assert result[0].layer == "L1"
 
     def test_both_kept_on_different_lines(self) -> None:
         l1 = self._finding("L1", line=10)
         asm = self._finding("ASM", proof="confirmed", line=20)
-        result = _dedup_findings([l1, asm])
+        result = dedup([l1, asm])
         assert len(result) == 2
+
+
+# ── Registry Resolver ─────────────────────────────────────────────────────
+
+
+class TestResolveOrder:
+    def test_respects_depends_on(self) -> None:
+        from agentwall.scanner import _resolve_order
+
+        class FakeL1:
+            name = "L1"
+            depends_on: tuple[str, ...] = ()
+
+        class FakeL3:
+            name = "L3"
+            depends_on = ("L2",)
+
+        class FakeL2:
+            name = "L2"
+            depends_on = ("L1",)
+
+        result = _resolve_order([FakeL3, FakeL1, FakeL2], enabled={"L1", "L2", "L3"})
+        names = [cls.name for cls in result]
+        assert names.index("L1") < names.index("L2")
+        assert names.index("L2") < names.index("L3")
+
+    def test_filters_by_enabled_layers(self) -> None:
+        from agentwall.scanner import _resolve_order
+
+        class FakeL1:
+            name = "L1"
+            depends_on: tuple[str, ...] = ()
+
+        class FakeL2:
+            name = "L2"
+            depends_on = ("L1",)
+
+        result = _resolve_order([FakeL1, FakeL2], enabled={"L1"})
+        names = [cls.name for cls in result]
+        assert "L2" not in names
+
+    def test_auto_includes_transitive_deps(self) -> None:
+        from agentwall.scanner import _resolve_order
+
+        class FakeL1:
+            name = "L1"
+            depends_on: tuple[str, ...] = ()
+
+        class FakeL2:
+            name = "L2"
+            depends_on = ("L1",)
+
+        class FakeL3:
+            name = "L3"
+            depends_on = ("L2",)
+
+        result = _resolve_order([FakeL1, FakeL2, FakeL3], enabled={"L3"})
+        names = [cls.name for cls in result]
+        assert "L2" in names
+        assert "L1" in names
+
+    def test_asm_runs_after_l2(self) -> None:
+        from agentwall.scanner import _resolve_order
+
+        class FakeL1:
+            name = "L1-memory"
+            depends_on: tuple[str, ...] = ()
+
+        class FakeL2:
+            name = "L2"
+            depends_on = ("L1-memory",)
+
+        class FakeASM:
+            name = "ASM"
+            depends_on = ("L2",)
+
+        result = _resolve_order([FakeASM, FakeL1, FakeL2], enabled={"ASM", "L2", "L1-memory"})
+        names = [cls.name for cls in result]
+        assert names.index("L2") < names.index("ASM")
+
+    def test_l6_runs_after_l3(self) -> None:
+        from agentwall.scanner import _resolve_order
+
+        class FakeL2:
+            name = "L2"
+            depends_on: tuple[str, ...] = ()
+
+        class FakeL3:
+            name = "L3"
+            depends_on = ("L2",)
+
+        class FakeL6:
+            name = "L6"
+            depends_on = ("L3",)
+
+        result = _resolve_order([FakeL6, FakeL2, FakeL3], enabled={"L2", "L3", "L6"})
+        names = [cls.name for cls in result]
+        assert names.index("L3") < names.index("L6")
+
+    def test_raises_on_dependency_cycle(self) -> None:
+        import pytest
+
+        from agentwall.scanner import _resolve_order
+
+        class FakeA:
+            name = "A"
+            depends_on = ("B",)
+
+        class FakeB:
+            name = "B"
+            depends_on = ("A",)
+
+        with pytest.raises(ValueError, match="cycle"):
+            _resolve_order([FakeA, FakeB], enabled={"A", "B"})

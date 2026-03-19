@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from agentwall.models import AgentSpec, ConfidenceLevel, Finding, ToolSpec
+from collections.abc import Sequence
+
+from agentwall.context import AnalysisContext
+from agentwall.models import ConfidenceLevel, Finding, ToolSpec
 from agentwall.rules import AW_TOOL_001, AW_TOOL_002, AW_TOOL_003, AW_TOOL_004, AW_TOOL_005, RuleDef
 
 _TOOL_LIMIT = 15
@@ -44,7 +47,15 @@ def _finding_from_rule_no_loc(
 class ToolAnalyzer:
     """Fire tool-related rules against an AgentSpec."""
 
-    def analyze(self, spec: AgentSpec) -> list[Finding]:
+    name: str = "L1-tools"
+    depends_on: Sequence[str] = ()
+    replace: bool = False
+    opt_in: bool = False
+
+    def analyze(self, ctx: AnalysisContext) -> list[Finding]:
+        spec = ctx.spec
+        if spec is None:
+            return []
         findings: list[Finding] = []
         for tool in spec.tools:
             findings.extend(self._check_tool(tool))

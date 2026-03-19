@@ -311,8 +311,13 @@ class ScanConfig:
     dynamic: bool = False  # L7 — runtime instrumentation
     llm_assist: bool = False  # L8 — LLM confidence scoring
     asm_shadow: bool = False  # ASM findings logged but not included in output
+    shadow_layers: set[str] = field(default_factory=set)
     semgrep_rules_dir: Path | None = None  # custom semgrep rules
     target: Path = field(default_factory=lambda: Path("."))
+
+    def __post_init__(self) -> None:
+        if self.asm_shadow and "ASM" not in self.shadow_layers:
+            self.shadow_layers = self.shadow_layers | {"ASM"}
 
     @classmethod
     def default(cls) -> ScanConfig:

@@ -25,6 +25,13 @@ from agentwall.models import (
     ToolSpec,
     WriteOp,
 )
+from agentwall.patterns import (
+    CODE_EXEC_CALLS,
+    CODE_EXEC_KEYWORDS,
+    DESTRUCTIVE_KEYWORDS,
+    RETRIEVAL_METHODS,
+    SANITIZE_NAMES,
+)
 
 # Vector store backend names to normalised identifiers
 _VECTOR_STORES: dict[str, str] = {
@@ -53,43 +60,6 @@ _MEMORY_CLASSES: dict[str, str] = {
     "ConversationEntityMemory": "conversation_entity",
     "ConversationKGMemory": "conversation_kg",
 }
-
-# Known sanitization function/method names (heuristic)
-_SANITIZE_NAMES = frozenset(
-    [
-        "sanitize",
-        "sanitise",
-        "clean",
-        "strip_tags",
-        "escape",
-        "filter_content",
-        "scrub",
-        "bleach",
-        "clean_text",
-        "sanitize_output",
-        "sanitize_content",
-    ]
-)
-
-# Tool names / keywords that indicate destructive behaviour
-_DESTRUCTIVE_KEYWORDS = frozenset(
-    ["delete", "remove", "drop", "rm", "write", "send", "post", "execute", "run"]
-)
-
-# AST call names / keywords that indicate code execution
-_CODE_EXEC_CALLS = frozenset(["subprocess", "eval", "exec"])
-_CODE_EXEC_KEYWORDS = frozenset(["shell", "exec", "eval", "subprocess", "code", "script", "sql"])
-
-# All retrieval method names that indicate vector store queries
-_RETRIEVAL_METHODS = frozenset(
-    [
-        "similarity_search",
-        "similarity_search_with_score",
-        "max_marginal_relevance_search",
-        "as_retriever",
-        "get_relevant_documents",
-    ]
-)
 
 
 class _FileVisitor(ast.NodeVisitor):
@@ -176,7 +146,7 @@ class _FileVisitor(ast.NodeVisitor):
         if isinstance(func, ast.Attribute):
             method = func.attr
             # Retrieval calls — all similarity search variants + retriever creation
-            if method in _RETRIEVAL_METHODS:
+            if method in RETRIEVAL_METHODS:
                 self._mark_retrieval(node, func)
             # add_texts / add_documents — write calls
             elif method in {"add_texts", "add_documents"}:
@@ -449,15 +419,15 @@ def _body_has_code_exec(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     for child in ast.walk(node):
         if isinstance(child, ast.Call):
             func = child.func
-            if isinstance(func, ast.Name) and func.id in _CODE_EXEC_CALLS:
+            if isinstance(func, ast.Name) and func.id in CODE_EXEC_CALLS:
                 return True
-            if isinstance(func, ast.Attribute) and func.attr in _CODE_EXEC_CALLS:
+            if isinstance(func, ast.Attribute) and func.attr in CODE_EXEC_CALLS:
                 return True
             # import subprocess; subprocess.run(...)
             if (
                 isinstance(func, ast.Attribute)
                 and isinstance(func.value, ast.Name)
-                and func.value.id in _CODE_EXEC_CALLS
+                and func.value.id in CODE_EXEC_CALLS
             ):
                 return True
     return False
@@ -465,19 +435,19 @@ def _body_has_code_exec(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
 
 def _name_is_destructive(name: str) -> bool:
     low = name.lower()
-    return any(kw in low for kw in _DESTRUCTIVE_KEYWORDS)
+    return any(kw in low for kw in DESTRUCTIVE_KEYWORDS)
 
 
 def _name_accepts_code_exec(name: str) -> bool:
     low = name.lower()
-    return any(kw in low for kw in _CODE_EXEC_KEYWORDS)
+    return any(kw in low for kw in CODE_EXEC_KEYWORDS)
 
 
 def _desc_accepts_code_exec(desc: str | None) -> bool:
     if not desc:
         return False
     low = desc.lower()
-    return any(kw in low for kw in _CODE_EXEC_KEYWORDS)
+    return any(kw in low for kw in CODE_EXEC_KEYWORDS)
 
 
 def _class_has_code_exec(node: ast.ClassDef) -> bool:
@@ -516,7 +486,7 @@ def _body_has_user_scope_check(node: ast.FunctionDef | ast.AsyncFunctionDef) -> 
 
 def _track_retrieval_assignments(tree: ast.Module, visitor: _FileVisitor) -> None:
     """Find assignments like `docs = vs.similarity_search(...)` and track the var name."""
-    retrieval_methods = _RETRIEVAL_METHODS
+    retrieval_methods = RETRIEVAL_METHODS
     for node in ast.walk(tree):
         if not isinstance(node, ast.Assign):
             continue
@@ -537,7 +507,7 @@ def _detect_sanitization(tree: ast.Module, visitor: _FileVisitor) -> None:
         if not isinstance(node, ast.Call):
             continue
         func_name = _get_name(node.func)
-        if not func_name or func_name.lower() not in _SANITIZE_NAMES:
+        if not func_name or func_name.lower() not in SANITIZE_NAMES:
             continue
         for arg in node.args:
             if isinstance(arg, ast.Name) and arg.id in visitor._retrieval_vars:

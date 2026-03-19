@@ -7,9 +7,23 @@ from pathlib import Path
 from agentwall.adapters.langchain import LangChainAdapter
 from agentwall.analyzers.callgraph import CallGraphAnalyzer, build_call_graph
 from agentwall.analyzers.memory import MemoryAnalyzer
+from agentwall.context import AnalysisContext
+from agentwall.models import AgentSpec, Finding, ScanConfig
 
 FIXTURES_CROSS = Path(__file__).parent / "fixtures" / "langchain_cross_file"
 FIXTURES_UNSAFE = Path(__file__).parent / "fixtures" / "langchain_unsafe"
+
+
+def _ctx(
+    spec: AgentSpec,
+    target: Path,
+    findings: list[Finding] | None = None,
+) -> AnalysisContext:
+    ctx = AnalysisContext(target=target, config=ScanConfig.default())
+    ctx.spec = spec
+    if findings is not None:
+        ctx.findings = findings
+    return ctx
 
 
 class TestBuildCallGraph:
@@ -36,28 +50,28 @@ class TestBuildCallGraph:
 class TestCallGraphAnalyzer:
     def test_processes_l1_findings(self) -> None:
         spec = LangChainAdapter().parse(FIXTURES_UNSAFE)
-        l1 = MemoryAnalyzer().analyze(spec)
+        l1 = MemoryAnalyzer().analyze(_ctx(spec, FIXTURES_UNSAFE))
         l2 = CallGraphAnalyzer()
-        refined = l2.analyze(spec, l1, FIXTURES_UNSAFE)
+        refined = l2.analyze(_ctx(spec, FIXTURES_UNSAFE, findings=l1))
         # Should still have findings (no filter found in call chain)
         assert len(refined) >= len(l1)
 
     def test_annotates_findings_with_l2_layer(self) -> None:
         spec = LangChainAdapter().parse(FIXTURES_UNSAFE)
-        l1 = MemoryAnalyzer().analyze(spec)
+        l1 = MemoryAnalyzer().analyze(_ctx(spec, FIXTURES_UNSAFE))
         # Filter only MEM-001 findings for L2 analysis
         mem001 = [f for f in l1 if f.rule_id == "AW-MEM-001"]
         l2 = CallGraphAnalyzer()
-        refined = l2.analyze(spec, mem001, FIXTURES_UNSAFE)
+        refined = l2.analyze(_ctx(spec, FIXTURES_UNSAFE, findings=mem001))
         for f in refined:
             if f.rule_id == "AW-MEM-001":
                 assert f.layer == "L2"
 
     def test_passthrough_non_mem001_findings(self) -> None:
         spec = LangChainAdapter().parse(FIXTURES_UNSAFE)
-        l1 = MemoryAnalyzer().analyze(spec)
+        l1 = MemoryAnalyzer().analyze(_ctx(spec, FIXTURES_UNSAFE))
         l2 = CallGraphAnalyzer()
-        refined = l2.analyze(spec, l1, FIXTURES_UNSAFE)
+        refined = l2.analyze(_ctx(spec, FIXTURES_UNSAFE, findings=l1))
         # Non-MEM-001 findings should pass through unchanged
         non_mem001 = [f for f in refined if f.rule_id != "AW-MEM-001"]
         original_non_mem001 = [f for f in l1 if f.rule_id != "AW-MEM-001"]

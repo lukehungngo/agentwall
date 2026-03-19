@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from agentwall.models import AgentSpec, ConfidenceLevel, Finding, MemoryConfig
+from collections.abc import Sequence
+
+from agentwall.context import AnalysisContext
+from agentwall.models import ConfidenceLevel, Finding, MemoryConfig
 from agentwall.rules import AW_MEM_001, AW_MEM_002, AW_MEM_003, AW_MEM_004, AW_MEM_005, RuleDef
 
 # Memory class backends — these are LangChain conversation memory, not vector stores.
@@ -41,7 +44,15 @@ def _finding_from_rule(
 class MemoryAnalyzer:
     """Fire memory-related rules against an AgentSpec."""
 
-    def analyze(self, spec: AgentSpec) -> list[Finding]:
+    name: str = "L1-memory"
+    depends_on: Sequence[str] = ()
+    replace: bool = False
+    opt_in: bool = False
+
+    def analyze(self, ctx: AnalysisContext) -> list[Finding]:
+        spec = ctx.spec
+        if spec is None:
+            return []
         findings: list[Finding] = []
         for mc in spec.memory_configs:
             findings.extend(self._check(mc))

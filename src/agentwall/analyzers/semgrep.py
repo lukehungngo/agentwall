@@ -9,8 +9,10 @@ from __future__ import annotations
 import json
 import subprocess
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
 
+from agentwall.context import AnalysisContext
 from agentwall.models import Category, ConfidenceLevel, Finding, Severity
 
 # Bundled rules directory
@@ -132,14 +134,25 @@ class SemgrepAnalyzer:
         if custom_rules_dir and custom_rules_dir.exists():
             self.rules_dirs.append(custom_rules_dir)
 
-    def analyze(self, target: Path) -> list[Finding]:
+    name: str = "L5"
+    depends_on: Sequence[str] = ()
+    replace: bool = False
+    opt_in: bool = False
+
+    def analyze(self, ctx: AnalysisContext) -> list[Finding]:
         """Run semgrep and return findings. Returns empty list if semgrep not installed."""
+        target = ctx.target
         if not _semgrep_available():
             warnings.warn(
                 "semgrep not installed — L5 analysis skipped. Install with: pip install semgrep",
                 stacklevel=2,
             )
             return []
+
+        # Pick up custom rules from config (not just __init__)
+        custom = getattr(ctx.config, "semgrep_rules_dir", None)
+        if custom and custom not in self.rules_dirs and custom.exists():
+            self.rules_dirs.append(custom)
 
         findings: list[Finding] = []
         for rules_dir in self.rules_dirs:

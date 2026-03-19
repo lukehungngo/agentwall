@@ -15,28 +15,17 @@ from __future__ import annotations
 
 import ast
 import warnings
+from collections.abc import Sequence
 from enum import Enum, auto
 
+from agentwall.context import AnalysisContext
 from agentwall.models import (
-    AgentSpec,
     Category,
     ConfidenceLevel,
     Finding,
     Severity,
 )
-
-# Retrieval methods
-_RETRIEVAL_METHODS = frozenset(
-    [
-        "similarity_search",
-        "as_retriever",
-        "get_relevant_documents",
-        "similarity_search_with_score",
-        "max_marginal_relevance_search",
-    ]
-)
-
-_FILTER_KWARGS = frozenset(["filter", "where", "where_document"])
+from agentwall.patterns import FILTER_KWARGS, RETRIEVAL_METHODS
 
 
 class FilterState(Enum):
@@ -161,7 +150,7 @@ class _PathAnalyzer(ast.NodeVisitor):
         func = node.func
         if not isinstance(func, ast.Attribute):
             return
-        if func.attr not in _RETRIEVAL_METHODS:
+        if func.attr not in RETRIEVAL_METHODS:
             return
 
         self.has_retrieval = True
@@ -169,7 +158,7 @@ class _PathAnalyzer(ast.NodeVisitor):
         # Check for filter kwarg
         has_filter = False
         for kw in node.keywords:
-            if kw.arg in _FILTER_KWARGS:
+            if kw.arg in FILTER_KWARGS:
                 has_filter = True
             if kw.arg == "search_kwargs" and isinstance(kw.value, ast.Dict):
                 for key in kw.value.keys:
@@ -183,8 +172,19 @@ class _PathAnalyzer(ast.NodeVisitor):
 class SymbolicAnalyzer:
     """L6 analyzer: path-sensitive filter analysis."""
 
-    def analyze(self, spec: AgentSpec) -> list[Finding]:
+    name: str = "L6"
+    depends_on: Sequence[str] = ("L3",)
+    replace: bool = False
+    opt_in: bool = False
+
+    def analyze(self, ctx: AnalysisContext) -> list[Finding]:
         """Analyze all functions for path-dependent filter application."""
+        spec = ctx.spec
+        if spec is None:
+            return []
+
+        _taint_results = ctx.taint_results  # available for taint-aware path analysis (v1.0)  # noqa: F841
+
         findings: list[Finding] = []
 
         for py_file in spec.source_files:

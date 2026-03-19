@@ -6,8 +6,16 @@ from pathlib import Path
 
 from agentwall.adapters.langchain import LangChainAdapter
 from agentwall.analyzers.memory import MemoryAnalyzer
+from agentwall.context import AnalysisContext
+from agentwall.models import AgentSpec, ScanConfig
 
 FIXTURES = Path(__file__).parent / "fixtures" / "langchain_injection"
+
+
+def _ctx(spec: AgentSpec) -> AnalysisContext:
+    ctx = AnalysisContext(target=Path("/tmp"), config=ScanConfig.default())
+    ctx.spec = spec
+    return ctx
 
 
 class TestAdapterMemoryClassDetection:
@@ -33,13 +41,13 @@ class TestAdapterMemoryClassDetection:
 class TestMEM004FiringOnInjectionFixture:
     def test_mem004_fires_for_memory_class(self) -> None:
         spec = LangChainAdapter().parse(FIXTURES)
-        findings = MemoryAnalyzer().analyze(spec)
+        findings = MemoryAnalyzer().analyze(_ctx(spec))
         rule_ids = [f.rule_id for f in findings]
         assert "AW-MEM-004" in rule_ids
 
     def test_mem005_fires_for_no_sanitization(self) -> None:
         spec = LangChainAdapter().parse(FIXTURES)
-        findings = MemoryAnalyzer().analyze(spec)
+        findings = MemoryAnalyzer().analyze(_ctx(spec))
         rule_ids = [f.rule_id for f in findings]
         assert "AW-MEM-005" in rule_ids
 
@@ -48,6 +56,6 @@ class TestMEM004DoesNotFireOnSafe:
     def test_safe_fixture_no_mem004(self) -> None:
         safe = Path(__file__).parent / "fixtures" / "langchain_safe"
         spec = LangChainAdapter().parse(safe)
-        findings = MemoryAnalyzer().analyze(spec)
+        findings = MemoryAnalyzer().analyze(_ctx(spec))
         rule_ids = [f.rule_id for f in findings]
         assert "AW-MEM-004" not in rule_ids

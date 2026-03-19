@@ -8,10 +8,11 @@ through call chains to confirm or dismiss L1 findings.
 from __future__ import annotations
 
 import ast
+from collections.abc import Sequence
 from pathlib import Path
 
+from agentwall.context import AnalysisContext
 from agentwall.models import (
-    AgentSpec,
     CallEdge,
     CallGraph,
     ConfidenceLevel,
@@ -20,21 +21,8 @@ from agentwall.models import (
     MemoryConfig,
     Severity,
 )
+from agentwall.patterns import FILTER_KWARGS, RETRIEVAL_METHODS
 from agentwall.rules import RuleDef
-
-# Retrieval methods that indicate a vector store query
-_RETRIEVAL_METHODS = frozenset(
-    [
-        "similarity_search",
-        "as_retriever",
-        "get_relevant_documents",
-        "similarity_search_with_score",
-        "max_marginal_relevance_search",
-    ]
-)
-
-# Filter kwargs that indicate tenant scoping
-_FILTER_KWARGS = frozenset(["filter", "where", "where_document"])
 
 
 def _finding_from_rule(rule: RuleDef, mc: MemoryConfig, *, layer: str = "L2") -> Finding:
@@ -204,10 +192,10 @@ class _FilterChecker(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> None:
         func = node.func
-        if isinstance(func, ast.Attribute) and func.attr in _RETRIEVAL_METHODS:
+        if isinstance(func, ast.Attribute) and func.attr in RETRIEVAL_METHODS:
             self.has_retrieval = True
             for kw in node.keywords:
-                if kw.arg in _FILTER_KWARGS:
+                if kw.arg in FILTER_KWARGS:
                     self.has_filter = True
                 if kw.arg == "search_kwargs" and isinstance(kw.value, ast.Dict):
                     for key in kw.value.keys:
@@ -308,21 +296,27 @@ def _function_has_filter(func_name: str, source_files: list[Path]) -> bool:
 class CallGraphAnalyzer:
     """L2 analyzer: use call graph to confirm/dismiss L1 findings."""
 
-    def analyze(
-        self,
-        spec: AgentSpec,
-        l1_findings: list[Finding],
-        target: Path,
-    ) -> list[Finding]:
+    name: str = "L2"
+    depends_on: Sequence[str] = ("L1-memory", "L1-tools")
+    replace: bool = True
+    opt_in: bool = False
+
+    def analyze(self, ctx: AnalysisContext) -> list[Finding]:
         """Refine L1 findings using call graph analysis.
 
         For each AW-MEM-001 finding, check if any caller in the chain
         applies a filter. If found, downgrade to INFO.
         """
+        spec = ctx.spec
+        if spec is None:
+            return list(ctx.findings)
+        l1_findings = list(ctx.findings)
+        target = ctx.target
         if not spec.source_files:
             return l1_findings
 
         graph = build_call_graph(target, spec.source_files)
+        ctx.call_graph = graph
         refined: list[Finding] = []
 
         for finding in l1_findings:
@@ -339,7 +333,7 @@ class CallGraphAnalyzer:
                     continue
                 callee = edge.callee.name
                 # Check if callee is a retrieval method
-                for method in _RETRIEVAL_METHODS:
+                for method in RETRIEVAL_METHODS:
                     if callee.endswith(f".{method}") or callee == method:
                         # Check all callers of this edge
                         caller = edge.caller.name

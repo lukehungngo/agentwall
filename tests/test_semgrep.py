@@ -10,6 +10,12 @@ from agentwall.analyzers.semgrep import (
     _parse_semgrep_output,
     _result_to_finding,
 )
+from agentwall.context import AnalysisContext
+from agentwall.models import ScanConfig
+
+
+def _ctx(target: Path) -> AnalysisContext:
+    return AnalysisContext(target=target, config=ScanConfig.default())
 
 
 class TestSemgrepParsing:
@@ -59,7 +65,7 @@ class TestSemgrepAnalyzer:
     def test_returns_empty_when_semgrep_not_available(self) -> None:
         with patch("agentwall.analyzers.semgrep._semgrep_available", return_value=False):
             analyzer = SemgrepAnalyzer()
-            findings = analyzer.analyze(Path("."))
+            findings = analyzer.analyze(_ctx(Path(".")))
             assert findings == []
 
     def test_rules_dir_exists(self) -> None:

@@ -11,10 +11,15 @@ Capital-aware: regex first, local model second, API last.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from agentwall.models import ConfidenceLevel, Finding
+
+if TYPE_CHECKING:
+    from agentwall.context import AnalysisContext
 
 # ── L8a: Regex heuristic ────────────────────────────────────────────────────
 
@@ -385,3 +390,16 @@ class ConfidenceScorer:
             else:
                 updated.append(verdict.finding)
         return updated
+
+
+class ConfidenceScorerAnalyzer:
+    """Thin registry wrapper around LLM-assisted confidence scoring (L8)."""
+
+    name: str = "L8"
+    depends_on: Sequence[str] = ()
+    replace: bool = True  # transforms all existing findings
+    opt_in: bool = True
+
+    def analyze(self, ctx: AnalysisContext) -> list[Finding]:
+        scorer = ConfidenceScorer(allow_local_llm=True, allow_api=False)
+        return scorer.apply_scores(ctx.findings)
