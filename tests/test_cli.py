@@ -84,11 +84,29 @@ class TestCliScan:
         )
         assert result.exit_code == 0
 
-    def test_scan_unsupported_framework_exits_2(self) -> None:
+    def test_scan_unsupported_framework_exits_0(self) -> None:
         result = runner.invoke(
-            app, ["scan", str(FIXTURES / "langchain_basic"), "--framework", "crewai"]
+            app, ["scan", str(FIXTURES / "langchain_basic"), "--framework", "crewai", "--fail-on", "none"]
         )
-        assert result.exit_code == 2
+        assert result.exit_code == 0
+
+    def test_scan_unsupported_framework_writes_output(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.json"
+        result = runner.invoke(
+            app,
+            [
+                "scan", str(FIXTURES / "langchain_basic"),
+                "--framework", "crewai",
+                "--format", "json",
+                "--fail-on", "none",
+                "--output", str(out),
+            ],
+        )
+        assert result.exit_code == 0
+        assert out.exists()
+        data = json.loads(out.read_text())
+        assert data["findings"] == []
+        assert data["warnings"]
 
     def test_scan_format_sarif(self, tmp_path: Path) -> None:
         out = tmp_path / "report.sarif"

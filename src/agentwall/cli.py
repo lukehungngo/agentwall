@@ -156,6 +156,10 @@ def scan(
 
     result = run_scan(target=path, framework=framework, config=config)
 
+    # Print warnings to stderr (non-fatal)
+    for w in result.warnings:
+        typer.echo(f"Warning: {w}", err=True)
+
     if result.errors and not result.findings:
         typer.echo(f"Scan error: {result.errors[0]}", err=True)
         raise typer.Exit(2)
