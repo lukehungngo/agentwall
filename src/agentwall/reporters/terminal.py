@@ -75,12 +75,8 @@ class TerminalReporter:
             sev_counts[f.severity] += 1
             conf_counts[f.confidence] += 1
 
-        sev_parts = "  ".join(
-            f"{s.value.upper()}: {n}" for s, n in sev_counts.items() if n
-        )
-        conf_parts = "  ".join(
-            f"{cl.value.upper()}: {n}" for cl, n in conf_counts.items() if n
-        )
+        sev_parts = "  ".join(f"{s.value.upper()}: {n}" for s, n in sev_counts.items() if n)
+        conf_parts = "  ".join(f"{cl.value.upper()}: {n}" for cl, n in conf_counts.items() if n)
 
         c.print(f"{len(result.findings)} findings")
         c.print(f"  by severity:    {sev_parts}")
@@ -95,10 +91,7 @@ class TerminalReporter:
         else:
             conf_text = f"Confidence: {conf_label}"
         ctx_tag = f"  [dim]({finding.file_context})[/dim]" if finding.file_context else ""
-        c.print(
-            f"  [{style}]{finding.rule_id}[/{style}]  {finding.title}"
-            f"  {conf_text}{ctx_tag}"
-        )
+        c.print(f"  [{style}]{finding.rule_id}[/{style}]  {finding.title}  {conf_text}{ctx_tag}")
         if finding.file is not None:
             loc = f"{finding.file}"
             if finding.line is not None:

@@ -61,7 +61,10 @@ class TestScannerFrameworkOverride:
         assert not result.errors, "unsupported framework should not populate errors"
         assert not result.findings
         assert result.warnings
-        assert "unsupported" in result.warnings[0].lower() or "undetected" in result.warnings[0].lower()
+        assert (
+            "unsupported" in result.warnings[0].lower()
+            or "undetected" in result.warnings[0].lower()
+        )
 
     def test_langchain_override_works(self) -> None:
         result = scan(FIXTURES / "langchain_unsafe", framework="langchain")
@@ -212,7 +215,8 @@ class TestASMIntegration:
     def test_asm_safe_no_tenant_isolation_findings(self) -> None:
         result = scan(FIXTURES / "asm_safe")
         tenant_findings = [
-            f for f in result.findings
+            f
+            for f in result.findings
             if f.layer == "ASM" and f.rule_id in ("AW-MEM-001", "AW-MEM-002", "AW-MEM-003")
         ]
         assert len(tenant_findings) == 0
@@ -227,9 +231,7 @@ class TestASMIntegration:
 
 
 class TestASMDedup:
-    def _finding(
-        self, layer: str, proof: str | None = None, line: int = 10
-    ) -> Finding:
+    def _finding(self, layer: str, proof: str | None = None, line: int = 10) -> Finding:
         return Finding(
             rule_id="AW-MEM-001",
             title="Test",

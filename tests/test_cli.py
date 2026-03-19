@@ -86,14 +86,30 @@ class TestCliScan:
 
     def test_scan_unsupported_framework_terminal_shows_no_findings(self) -> None:
         result = runner.invoke(
-            app, ["scan", str(FIXTURES / "langchain_basic"), "--framework", "crewai", "--fail-on", "none"]
+            app,
+            [
+                "scan",
+                str(FIXTURES / "langchain_basic"),
+                "--framework",
+                "crewai",
+                "--fail-on",
+                "none",
+            ],
         )
         assert result.exit_code == 0
         assert "No findings." in result.output
 
     def test_scan_unsupported_framework_exits_0(self) -> None:
         result = runner.invoke(
-            app, ["scan", str(FIXTURES / "langchain_basic"), "--framework", "crewai", "--fail-on", "none"]
+            app,
+            [
+                "scan",
+                str(FIXTURES / "langchain_basic"),
+                "--framework",
+                "crewai",
+                "--fail-on",
+                "none",
+            ],
         )
         assert result.exit_code == 0
 
@@ -102,11 +118,16 @@ class TestCliScan:
         result = runner.invoke(
             app,
             [
-                "scan", str(FIXTURES / "langchain_basic"),
-                "--framework", "crewai",
-                "--format", "json",
-                "--fail-on", "none",
-                "--output", str(out),
+                "scan",
+                str(FIXTURES / "langchain_basic"),
+                "--framework",
+                "crewai",
+                "--format",
+                "json",
+                "--fail-on",
+                "none",
+                "--output",
+                str(out),
             ],
         )
         assert result.exit_code == 0
@@ -185,7 +206,6 @@ class TestCliScan:
         )
         assert result.exit_code == 2
         assert "--format must be one of" in result.output
-
 
     def test_scan_confidence_filter_high(self) -> None:
         result = runner.invoke(
@@ -286,9 +306,7 @@ class TestCliVerify:
     def test_verify_non_langchain_project_exits_0(self, tmp_path: Path) -> None:
         """verify on a dir with no langchain imports should exit 0 (PASS), not exit 2."""
         (tmp_path / "main.py").write_text("import flask\napp = flask.Flask(__name__)\n")
-        result = runner.invoke(
-            app, ["verify", "--finding", "AW-MEM-001", str(tmp_path)]
-        )
+        result = runner.invoke(app, ["verify", "--finding", "AW-MEM-001", str(tmp_path)])
         assert result.exit_code == 0
         assert "PASS" in result.output
 

@@ -51,7 +51,6 @@ _CONFIDENCE_MAP: dict[str, ConfidenceLevel | None] = {
 }
 
 
-
 def _print_formatted_output(result: ScanResult, fmt: str) -> None:
     """Print formatted output to stdout."""
     import json
@@ -118,7 +117,9 @@ def scan(
     confidence: str = typer.Option(
         "all", "--confidence", help="Minimum confidence: high|medium|low|all"
     ),  # noqa: B008
-    asm_shadow: bool = typer.Option(False, "--asm-shadow", help="Run ASM in shadow mode (log but don't output)."),  # noqa: B008
+    asm_shadow: bool = typer.Option(
+        False, "--asm-shadow", help="Run ASM in shadow mode (log but don't output)."
+    ),  # noqa: B008
 ) -> None:
     """Scan an agent directory for memory and tool security issues."""
     if not path.exists():

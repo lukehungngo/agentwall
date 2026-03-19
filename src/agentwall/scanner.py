@@ -149,7 +149,11 @@ def scan(
                 for f in shadow_findings:
                     shadow_logger.debug(
                         "%s shadow: %s %s at %s:%s",
-                        analyzer_cls.name, f.rule_id, f.title, f.file, f.line,
+                        analyzer_cls.name,
+                        f.rule_id,
+                        f.title,
+                        f.file,
+                        f.line,
                     )
             except Exception as exc:
                 msg = f"{analyzer_cls.name} analysis failed: {exc}"
