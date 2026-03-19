@@ -216,6 +216,9 @@ def verify(
     config = ScanConfig.fast()
     result = run_scan(target=path, config=config)
 
+    for w in result.warnings:
+        typer.echo(f"Warning: {w}", err=True)
+
     if result.errors and not result.findings:
         typer.echo(f"Scan error: {result.errors[0]}", err=True)
         raise typer.Exit(2)

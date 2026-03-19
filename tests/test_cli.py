@@ -276,6 +276,15 @@ class TestCliVerify:
         assert result.exit_code == 2
         assert "does not exist" in result.output
 
+    def test_verify_non_langchain_project_exits_0(self, tmp_path: Path) -> None:
+        """verify on a dir with no langchain imports should exit 0 (PASS), not exit 2."""
+        (tmp_path / "main.py").write_text("import flask\napp = flask.Flask(__name__)\n")
+        result = runner.invoke(
+            app, ["verify", "--finding", "AW-MEM-001", str(tmp_path)]
+        )
+        assert result.exit_code == 0
+        assert "PASS" in result.output
+
     def test_verify_json_format_pass(self) -> None:
         result = runner.invoke(
             app,
