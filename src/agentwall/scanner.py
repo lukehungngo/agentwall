@@ -124,10 +124,20 @@ def scan(
     # ── Collect source files (always, regardless of framework) ───────────
     source_files = _source_files(target)
 
-    # ── Parse adapter (langchain only for now) ───────────────────────────
+    # ── Parse adapter ────────────────────────────────────────────────────
     spec = None
     if detected == "langchain":
         adapter = LangChainAdapter()
+        spec = adapter.parse(target)
+    elif detected == "llamaindex":
+        from agentwall.adapters.llamaindex import LlamaIndexAdapter
+
+        adapter = LlamaIndexAdapter()
+        spec = adapter.parse(target)
+    elif detected == "crewai":
+        from agentwall.adapters.crewai import CrewAIAdapter
+
+        adapter = CrewAIAdapter()
         spec = adapter.parse(target)
     else:
         scan_warnings.append(

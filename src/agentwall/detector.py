@@ -8,9 +8,11 @@ from pathlib import Path
 
 _FRAMEWORK_SIGNATURES: dict[str, list[str]] = {
     "langchain": ["langchain", "langchain_core", "langchain_community", "langgraph"],
+    "llamaindex": ["llama_index", "llama-index", "llamaindex"],
     "openai_agents": ["openai_agents", "agents"],
     "crewai": ["crewai"],
     "autogen": ["autogen", "pyautogen"],
+    "vectorstore_direct": ["chromadb", "pinecone", "qdrant_client", "pymilvus", "weaviate"],
 }
 
 # Directories that are never part of the primary source — skip entirely.

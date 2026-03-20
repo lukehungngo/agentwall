@@ -57,7 +57,7 @@ class TestScannerBasic:
 
 class TestScannerFrameworkOverride:
     def test_unsupported_framework_returns_warning_not_error(self) -> None:
-        result = scan(FIXTURES / "langchain_unsafe", framework="crewai")
+        result = scan(FIXTURES / "langchain_unsafe", framework="unknown_framework")
         assert not result.errors, "unsupported framework should not populate errors"
         assert not result.findings
         assert result.warnings
