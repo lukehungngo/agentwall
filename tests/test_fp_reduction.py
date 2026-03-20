@@ -231,8 +231,8 @@ class TestSEC003FalsePositives:
 
 
 class TestMEM001FalsePositives:
-    def test_no_engine_profiles_fires_normally(self, tmp_path: Path) -> None:
-        """Without engine profiles, MEM-001 fires as CRITICAL."""
+    def test_no_engine_profiles_fires_as_info_without_web_framework(self, tmp_path: Path) -> None:
+        """Without engine profiles and no web framework, MEM-001 fires as INFO."""
         from agentwall.analyzers.memory import MemoryAnalyzer
         from agentwall.models import MemoryConfig
 
@@ -251,7 +251,8 @@ class TestMEM001FalsePositives:
         )()
         findings = MemoryAnalyzer().analyze(ctx)
         mem001 = [f for f in findings if f.rule_id == "AW-MEM-001"]
-        assert any(f.severity.value == "critical" for f in mem001)
+        assert len(mem001) == 1
+        assert mem001[0].severity.value == "info"
 
     def test_collection_per_tenant_downgrades(self, tmp_path: Path) -> None:
         """Engine says COLLECTION_PER_TENANT -> downgrade to MEDIUM."""
@@ -284,8 +285,8 @@ class TestMEM001FalsePositives:
         for f in mem001:
             assert f.severity.value != "critical", "Per-tenant should not be CRITICAL"
 
-    def test_filter_on_read_suppresses(self, tmp_path: Path) -> None:
-        """Engine says FILTER_ON_READ -> suppress MEM-001."""
+    def test_filter_on_read_downgrades_to_info(self, tmp_path: Path) -> None:
+        """Engine says FILTER_ON_READ -> MEM-001 fires as INFO (tenant-scoped)."""
         from agentwall.analyzers.memory import MemoryAnalyzer
         from agentwall.engine.models import PropertyExtraction, StoreProfile, ValueKind
         from agentwall.models import MemoryConfig
@@ -318,7 +319,8 @@ class TestMEM001FalsePositives:
         ctx.store_profiles = [profile]
         findings = MemoryAnalyzer().analyze(ctx)
         mem001 = [f for f in findings if f.rule_id == "AW-MEM-001"]
-        assert len(mem001) == 0, "FILTER_ON_READ should suppress MEM-001"
+        assert len(mem001) == 1, "FILTER_ON_READ should still emit a finding"
+        assert mem001[0].severity.value == "info", "Should be INFO with tenant-scoped filter"
 
 
 # ---------------------------------------------------------------------------

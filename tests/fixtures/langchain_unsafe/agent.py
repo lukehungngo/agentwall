@@ -1,9 +1,12 @@
 import os
 import subprocess
 
+from fastapi import FastAPI
 from langchain.agents import AgentExecutor
 from langchain.tools import Tool
 from langchain_community.vectorstores import Chroma
+
+app = FastAPI()
 
 vectorstore = Chroma(collection_name="all_users")
 query = "find documents"

@@ -6,7 +6,12 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from agentwall.context import AnalysisContext
-from agentwall.models import ConfidenceLevel, Finding, MemoryConfig, Severity
+from agentwall.engine.isolation_evidence import (
+    classify_isolation,
+    collect_evidence,
+    project_has_web_framework,
+)
+from agentwall.models import ConfidenceLevel, Finding, MemoryConfig
 from agentwall.rules import AW_MEM_001, AW_MEM_002, AW_MEM_003, AW_MEM_004, AW_MEM_005, RuleDef
 
 # Memory class backends — these are LangChain conversation memory, not vector stores.
@@ -56,9 +61,13 @@ class MemoryAnalyzer:
         if spec is None:
             return []
         engine_isolation = self._get_engine_isolation(ctx)
+        # Compute web framework presence once for the entire scan.
+        has_web_framework = project_has_web_framework(ctx)
         findings: list[Finding] = []
         for mc in spec.memory_configs:
-            findings.extend(self._check(mc, engine_isolation))
+            findings.extend(
+                self._check(mc, ctx, engine_isolation, has_web_framework=has_web_framework)
+            )
         return findings
 
     @staticmethod
@@ -76,7 +85,12 @@ class MemoryAnalyzer:
         return result
 
     def _check(
-        self, mc: MemoryConfig, engine_isolation: dict[str, str] | None = None
+        self,
+        mc: MemoryConfig,
+        ctx: AnalysisContext,
+        engine_isolation: dict[str, str] | None = None,
+        *,
+        has_web_framework: bool = False,
     ) -> list[Finding]:
         findings: list[Finding] = []
 
@@ -86,29 +100,25 @@ class MemoryAnalyzer:
         no_write_meta = not mc.has_metadata_on_write
 
         # AW-MEM-001: no isolation AND no retrieval filter (vector stores only)
-        # HIGH confidence — direct pattern match (no filter kwarg observed)
+        # Severity is determined by evidence strength, not hardcoded.
         if not is_memory_class and no_isolation and no_filter:
-            iso = (engine_isolation or {}).get(mc.backend, "")
-            if iso == "filter_on_read":
-                pass  # suppressed — engine confirmed all reads carry tenant filter
-            elif iso == "collection_per_tenant":
-                f = _finding_from_rule(AW_MEM_001, mc, ConfidenceLevel.LOW)
-                findings.append(
-                    Finding(
-                        rule_id=f.rule_id,
-                        title=f.title,
-                        severity=Severity.MEDIUM,
-                        category=f.category,
-                        description=f.description
-                        + " (downgraded: engine detected per-tenant collection isolation)",
-                        fix=f.fix,
-                        file=f.file,
-                        line=f.line,
-                        confidence=ConfidenceLevel.LOW,
-                    )
+            evidence = collect_evidence(
+                mc, ctx, engine_isolation, has_web_framework=has_web_framework
+            )
+            severity, confidence, reason = classify_isolation(evidence)
+            findings.append(
+                Finding(
+                    rule_id=AW_MEM_001.rule_id,
+                    title=AW_MEM_001.title,
+                    severity=severity,
+                    category=AW_MEM_001.category,
+                    description=f"{AW_MEM_001.description} [{reason}]",
+                    fix=AW_MEM_001.fix,
+                    file=mc.source_file,
+                    line=mc.source_line,
+                    confidence=confidence,
                 )
-            else:
-                findings.append(_finding_from_rule(AW_MEM_001, mc, ConfidenceLevel.HIGH))
+            )
 
         # AW-MEM-002: has write metadata BUT no retrieval filter (false sense of security)
         # HIGH confidence — concrete mismatch between write and read paths
