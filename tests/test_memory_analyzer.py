@@ -26,11 +26,11 @@ class TestMemoryAnalyzerMEM001:
         rule_ids = [f.rule_id for f in findings]
         assert "AW-MEM-001" in rule_ids
 
-    def test_severity_is_critical(self) -> None:
+    def test_severity_is_high(self) -> None:
         mc = MemoryConfig(backend="chroma")
         findings = MemoryAnalyzer().analyze(_ctx(_spec(mc)))
         mem001 = next(f for f in findings if f.rule_id == "AW-MEM-001")
-        assert mem001.severity == Severity.CRITICAL
+        assert mem001.severity == Severity.HIGH
 
     def test_does_not_fire_when_filter_present(self) -> None:
         mc = MemoryConfig(backend="chroma", has_metadata_filter_on_retrieval=True)

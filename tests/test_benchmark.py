@@ -59,10 +59,16 @@ class TestTruePositives:
         rule_ids = {f.rule_id for f in result.findings}
         assert "AW-MEM-004" in rule_ids
 
-    def test_unsafe_has_critical_findings(self) -> None:
-        """langchain_unsafe should produce at least one CRITICAL finding."""
+    def test_unsafe_has_high_findings(self) -> None:
+        """langchain_unsafe should produce at least one HIGH finding.
+
+        L1 MEM-001 fires as HIGH. CRITICAL requires L3 taint confirmation that
+        a user identity source exists but does not reach the retrieval filter.
+        The langchain_unsafe fixture has no user identity source, so L3 does not
+        promote to CRITICAL — HIGH from L1 is the expected outcome.
+        """
         result = scan(FIXTURES / "langchain_unsafe")
-        assert any(f.severity == Severity.CRITICAL for f in result.findings)
+        assert any(f.severity == Severity.HIGH for f in result.findings)
 
     def test_injection_has_high_findings(self) -> None:
         """langchain_injection should produce at least one HIGH finding."""

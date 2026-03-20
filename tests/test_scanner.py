@@ -17,9 +17,12 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 class TestScannerUnsafe:
-    def test_returns_at_least_one_critical(self) -> None:
+    def test_returns_at_least_one_high(self) -> None:
+        # L1 MEM-001 fires HIGH. CRITICAL requires L3 taint confirmation
+        # (user identity source confirmed absent from filter). The unsafe
+        # fixture has no user identity source, so HIGH is the expected floor.
         result = scan(FIXTURES / "langchain_unsafe")
-        assert any(f.severity == Severity.CRITICAL for f in result.findings)
+        assert any(f.severity == Severity.HIGH for f in result.findings)
 
     def test_findings_sorted_critical_first(self) -> None:
         result = scan(FIXTURES / "langchain_unsafe")

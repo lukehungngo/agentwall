@@ -232,7 +232,7 @@ class TestSEC003FalsePositives:
 
 class TestMEM001FalsePositives:
     def test_no_engine_profiles_fires_normally(self, tmp_path: Path) -> None:
-        """Without engine profiles, MEM-001 fires as CRITICAL."""
+        """Without engine profiles, MEM-001 fires as HIGH (not CRITICAL)."""
         from agentwall.analyzers.memory import MemoryAnalyzer
         from agentwall.models import MemoryConfig
 
@@ -251,7 +251,10 @@ class TestMEM001FalsePositives:
         )()
         findings = MemoryAnalyzer().analyze(ctx)
         mem001 = [f for f in findings if f.rule_id == "AW-MEM-001"]
-        assert any(f.severity.value == "critical" for f in mem001)
+        assert len(mem001) >= 1
+        assert all(f.severity.value == "high" for f in mem001), (
+            f"L1 MEM-001 should be HIGH without L3 confirmation, got: {[f.severity.value for f in mem001]}"
+        )
 
     def test_collection_per_tenant_downgrades(self, tmp_path: Path) -> None:
         """Engine says COLLECTION_PER_TENANT -> downgrade to MEDIUM."""

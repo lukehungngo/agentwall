@@ -108,7 +108,14 @@ class MemoryAnalyzer:
                     )
                 )
             else:
-                findings.append(_finding_from_rule(AW_MEM_001, mc, ConfidenceLevel.HIGH))
+                # No isolation detected — fire as HIGH (not CRITICAL).
+                # Only L3 taint analysis can promote to CRITICAL when it confirms
+                # user identity doesn't reach the filter.
+                findings.append(
+                    _finding_from_rule(AW_MEM_001, mc, ConfidenceLevel.MEDIUM).model_copy(
+                        update={"severity": Severity.HIGH}
+                    )
+                )
 
         # AW-MEM-002: has write metadata BUT no retrieval filter (false sense of security)
         # HIGH confidence — concrete mismatch between write and read paths
