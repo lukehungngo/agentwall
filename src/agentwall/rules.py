@@ -1,4 +1,4 @@
-"""All AW-MEM-* and AW-TOOL-* rule definitions."""
+"""All rule definitions: AW-MEM, AW-TOOL, AW-SEC, AW-RAG, AW-MCP, AW-SER, AW-AGT."""
 
 from dataclasses import dataclass
 
@@ -139,6 +139,221 @@ AW_TOOL_005 = RuleDef(
     fix="Split the agent into specialized sub-agents with focused tool sets.",
 )
 
+# ── Secrets rules ────────────────────────────────────────────────────────────
+
+AW_SEC_001 = RuleDef(
+    rule_id="AW-SEC-001",
+    title="Hardcoded API key/secret in agent config",
+    severity=Severity.HIGH,
+    category=Category.SECRETS,
+    description=(
+        "A string literal matching known API key patterns (sk-, AKIA, ghp_, xoxb-) "
+        "was found in agent or tool configuration code."
+    ),
+    fix="Move secrets to environment variables or a secrets manager.",
+)
+
+AW_SEC_002 = RuleDef(
+    rule_id="AW-SEC-002",
+    title="Env var injected into prompt template",
+    severity=Severity.MEDIUM,
+    category=Category.SECRETS,
+    description=(
+        "An environment variable value flows into a prompt template. "
+        "If the env var contains sensitive data, it will be sent to the LLM."
+    ),
+    fix="Redact sensitive env vars before injecting into prompts.",
+)
+
+AW_SEC_003 = RuleDef(
+    rule_id="AW-SEC-003",
+    title="Agent context logged at DEBUG level",
+    severity=Severity.MEDIUM,
+    category=Category.SECRETS,
+    description=(
+        "Agent memory, chat history, or conversation context is passed to "
+        "a logging or print call. This may expose sensitive user data in logs."
+    ),
+    fix="Redact or summarize context before logging. Never log full conversation state.",
+)
+
+# ── RAG rules ────────────────────────────────────────────────────────────────
+
+AW_RAG_001 = RuleDef(
+    rule_id="AW-RAG-001",
+    title="Retrieved context injected into prompt without delimiters",
+    severity=Severity.HIGH,
+    category=Category.RAG,
+    description=(
+        "Retrieved documents are concatenated directly into a prompt without structural "
+        "delimiters (XML tags, fenced blocks). This increases indirect prompt injection risk."
+    ),
+    fix="Wrap retrieved content in explicit delimiters: <context>...</context> or similar.",
+)
+
+AW_RAG_002 = RuleDef(
+    rule_id="AW-RAG-002",
+    title="Ingestion from untrusted source without validation",
+    severity=Severity.HIGH,
+    category=Category.RAG,
+    description=(
+        "Documents from an external source (HTTP, file upload, web scraper) are ingested "
+        "into the vector store without content validation or sanitization."
+    ),
+    fix="Validate and sanitize document content before calling add_documents/add_texts.",
+)
+
+AW_RAG_003 = RuleDef(
+    rule_id="AW-RAG-003",
+    title="Unencrypted local vector store persistence",
+    severity=Severity.MEDIUM,
+    category=Category.RAG,
+    description=(
+        "A local vector store (FAISS, Chroma) persists data to disk without encryption. "
+        "Stored embeddings and documents are readable by any process with file access."
+    ),
+    fix="Encrypt the persistence directory or use a vector store with built-in encryption.",
+)
+
+AW_RAG_004 = RuleDef(
+    rule_id="AW-RAG-004",
+    title="Vector store exposed on network without auth",
+    severity=Severity.HIGH,
+    category=Category.RAG,
+    description=(
+        "A vector store client connects to a remote server without authentication parameters. "
+        "The store may be accessible to anyone on the network."
+    ),
+    fix="Add api_key, auth_credentials, or equivalent auth parameters to the client.",
+)
+
+# ── MCP rules ────────────────────────────────────────────────────────────────
+
+AW_MCP_001 = RuleDef(
+    rule_id="AW-MCP-001",
+    title="MCP server over HTTP without authentication",
+    severity=Severity.HIGH,
+    category=Category.MCP,
+    description=(
+        "An MCP server is exposed over HTTP/SSE without authentication middleware. "
+        "Any client on the network can invoke its tools."
+    ),
+    fix="Add authentication middleware to the MCP server handler chain.",
+)
+
+AW_MCP_002 = RuleDef(
+    rule_id="AW-MCP-002",
+    title="Static long-lived token in MCP config",
+    severity=Severity.HIGH,
+    category=Category.MCP,
+    description=(
+        "A hardcoded token or API key was found in MCP server/client initialization. "
+        "Static credentials cannot be rotated without redeployment."
+    ),
+    fix="Load MCP credentials from environment variables or a secrets manager.",
+)
+
+AW_MCP_003 = RuleDef(
+    rule_id="AW-MCP-003",
+    title="MCP tool with shell/filesystem access",
+    severity=Severity.MEDIUM,
+    category=Category.MCP,
+    description=(
+        "An MCP tool handler contains subprocess, os.system, or open() calls with "
+        "variable arguments. This enables arbitrary command/file execution via the tool."
+    ),
+    fix="Restrict tool inputs with an allowlist. Avoid shell=True and variable file paths.",
+)
+
+# ── Serialization rules ─────────────────────────────────────────────────────
+
+AW_SER_001 = RuleDef(
+    rule_id="AW-SER-001",
+    title="Unsafe deserialization of agent state",
+    severity=Severity.HIGH,
+    category=Category.SERIALIZATION,
+    description=(
+        "Unsafe deserialization (pickle.load, yaml.unsafe_load, torch.load) is used "
+        "in an agent or memory code path. This enables remote code execution if the "
+        "serialized data is attacker-controlled."
+    ),
+    fix="Use safe alternatives: json, yaml.safe_load, torch.load(weights_only=True).",
+)
+
+AW_SER_002 = RuleDef(
+    rule_id="AW-SER-002",
+    title="Unpinned agent framework dependency",
+    severity=Severity.MEDIUM,
+    category=Category.SERIALIZATION,
+    description=(
+        "An agent framework library is listed as a dependency without a version pin. "
+        "Unpinned dependencies can introduce breaking changes or vulnerabilities silently."
+    ),
+    fix="Pin agent framework dependencies to a specific version or bounded range.",
+)
+
+AW_SER_003 = RuleDef(
+    rule_id="AW-SER-003",
+    title="Dynamic import of external tool/plugin",
+    severity=Severity.MEDIUM,
+    category=Category.SERIALIZATION,
+    description=(
+        "importlib.import_module() or __import__() is called with a variable argument "
+        "in a tool registration path. This enables loading arbitrary code as a tool."
+    ),
+    fix="Use a static tool registry with explicit imports. Avoid dynamic plugin loading.",
+)
+
+# ── Agent architecture rules ────────────────────────────────────────────────
+
+AW_AGT_001 = RuleDef(
+    rule_id="AW-AGT-001",
+    title="Sub-agent inherits full parent tool set",
+    severity=Severity.HIGH,
+    category=Category.AGENT,
+    description=(
+        "A sub-agent receives the full tool set of its parent agent without filtering. "
+        "This violates the principle of least privilege."
+    ),
+    fix="Filter the tool list to only tools the sub-agent needs.",
+)
+
+AW_AGT_002 = RuleDef(
+    rule_id="AW-AGT-002",
+    title="Agent-to-agent communication without authentication",
+    severity=Severity.MEDIUM,
+    category=Category.AGENT,
+    description=(
+        "An agent delegation call passes no authentication-related parameters. "
+        "The receiving agent cannot verify the caller's identity."
+    ),
+    fix="Pass auth tokens or session credentials in agent delegation calls.",
+)
+
+AW_AGT_003 = RuleDef(
+    rule_id="AW-AGT-003",
+    title="Agent has read+write+delete on same resource without separate approval",
+    severity=Severity.MEDIUM,
+    category=Category.AGENT,
+    description=(
+        "An agent has tools for reading, writing, and deleting the same resource type "
+        "but the destructive tools lack a separate approval gate."
+    ),
+    fix="Add a separate approval gate for destructive tools on shared resources.",
+)
+
+AW_AGT_004 = RuleDef(
+    rule_id="AW-AGT-004",
+    title="LLM output stored to memory without validation",
+    severity=Severity.HIGH,
+    category=Category.AGENT,
+    description=(
+        "LLM output is stored directly into agent memory or a vector store without "
+        "validation. This enables memory poisoning (MemoryGraft) attacks."
+    ),
+    fix="Validate or sanitize LLM output before persisting to memory.",
+)
+
 # ── Registry ──────────────────────────────────────────────────────────────────
 
 ALL_RULES: dict[str, RuleDef] = {
@@ -154,5 +369,22 @@ ALL_RULES: dict[str, RuleDef] = {
         AW_TOOL_003,
         AW_TOOL_004,
         AW_TOOL_005,
+        AW_SEC_001,
+        AW_SEC_002,
+        AW_SEC_003,
+        AW_RAG_001,
+        AW_RAG_002,
+        AW_RAG_003,
+        AW_RAG_004,
+        AW_MCP_001,
+        AW_MCP_002,
+        AW_MCP_003,
+        AW_SER_001,
+        AW_SER_002,
+        AW_SER_003,
+        AW_AGT_001,
+        AW_AGT_002,
+        AW_AGT_003,
+        AW_AGT_004,
     ]
 }

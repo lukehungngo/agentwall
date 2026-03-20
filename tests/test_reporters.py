@@ -176,7 +176,7 @@ class TestSarifReporter:
         assert isinstance(runs, list)
         driver = runs[0]["tool"]["driver"]  # type: ignore[index]
         rules = driver["rules"]  # type: ignore[index]
-        assert len(rules) == 10  # 5 MEM + 5 TOOL rules
+        assert len(rules) == 27  # all registered rules
 
     def test_sarif_results_map_to_findings(self) -> None:
         findings = [
