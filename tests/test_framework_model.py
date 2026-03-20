@@ -306,3 +306,30 @@ def test_langchain_model_all_stores_have_retriever_factory() -> None:
             f"{name}: expected retriever_filter_path='search_kwargs.filter', "
             f"got {store.retriever_filter_path!r}"
         )
+
+
+# ── LLAMAINDEX_MODEL ───────────────────────────────────────────────────────────
+
+from agentwall.frameworks.llamaindex import LLAMAINDEX_MODEL  # noqa: E402
+
+
+def test_llamaindex_model_has_pinecone() -> None:
+    assert "PineconeVectorStore" in LLAMAINDEX_MODEL.stores
+    pinecone = LLAMAINDEX_MODEL.stores["PineconeVectorStore"]
+    assert pinecone.backend == "pinecone"
+    assert "namespace" in pinecone.isolation_params
+
+
+def test_llamaindex_model_has_chroma() -> None:
+    assert "ChromaVectorStore" in LLAMAINDEX_MODEL.stores
+
+
+def test_llamaindex_model_uses_different_filter_kwarg() -> None:
+    pinecone = LLAMAINDEX_MODEL.stores["PineconeVectorStore"]
+    assert "query" in pinecone.read_methods
+    assert pinecone.read_methods["query"] == "filters"
+
+
+def test_llamaindex_model_qdrant_uses_query_filter() -> None:
+    qdrant = LLAMAINDEX_MODEL.stores["QdrantVectorStore"]
+    assert qdrant.read_methods["query"] == "query_filter"
