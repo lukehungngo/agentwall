@@ -67,6 +67,7 @@ class SerializationAnalyzer:
                 call_name in DYNAMIC_IMPORT_CALLS
                 and node.args
                 and not isinstance(node.args[0], ast.Constant)
+                and not self._is_dict_lookup_import(node)
                 and not ctx.should_suppress(AW_SER_003.rule_id)
             ):
                 sev = ctx.severity_override(AW_SER_003.rule_id) or AW_SER_003.severity
@@ -107,4 +108,46 @@ class SerializationAnalyzer:
                     return loader_name in SAFE_YAML_LOADERS
                 if isinstance(kw.value, ast.Name):
                     return kw.value.id in SAFE_YAML_LOADERS
+        return False
+
+    @staticmethod
+    def _is_constant_dict_name(name: str) -> bool:
+        """Return True when the name looks like a module-level constant dict.
+
+        Conventions: leading underscore (_IMPORTS, _LIBS) or ALL_CAPS (BACKEND_MAP).
+        Plain lowercase names (plugins, registry) could be local dicts populated
+        from user input, so they are NOT considered safe.
+        """
+        return name.startswith("_") or name == name.upper()
+
+    @staticmethod
+    def _is_constant_dict_subscript(node: ast.expr) -> bool:
+        """Return True when node is a subscript on a module-level constant dict name."""
+        return (
+            isinstance(node, ast.Subscript)
+            and isinstance(node.value, ast.Name)
+            and SerializationAnalyzer._is_constant_dict_name(node.value.id)
+        )
+
+    @staticmethod
+    def _is_dict_lookup_import(node: ast.Call) -> bool:
+        """Return True when the first arg to import_module is a safe dict-lookup pattern.
+
+        Suppressed patterns:
+        - ``importlib.import_module(_IMPORTS[name])``  — direct subscript
+        - ``importlib.import_module("." + _LIBS[name])``  — BinOp with one constant-dict side
+        """
+        if not node.args:
+            return False
+
+        arg = node.args[0]
+
+        if SerializationAnalyzer._is_constant_dict_subscript(arg):
+            return True
+
+        if isinstance(arg, ast.BinOp) and isinstance(arg.op, ast.Add):
+            return SerializationAnalyzer._is_constant_dict_subscript(
+                arg.left
+            ) or SerializationAnalyzer._is_constant_dict_subscript(arg.right)
+
         return False
