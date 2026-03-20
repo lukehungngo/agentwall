@@ -30,6 +30,43 @@ _SKIP_DIRS = frozenset(
     ]
 )
 
+# .env file names that indicate template/test files — skip secret checks entirely
+_TEMPLATE_SUFFIXES = frozenset(
+    {
+        ".env.template",
+        ".env.example",
+        ".env.sample",
+        ".env.default",
+        ".env.test",
+        ".env.testing",
+        ".env.development",
+        ".env.dev",
+    }
+)
+
+# Key name suffixes that indicate a non-secret configuration value
+_NON_SECRET_KEY_SUFFIXES = frozenset(
+    {
+        "_SECONDS",
+        "_TIMEOUT",
+        "_LIMIT",
+        "_COUNT",
+        "_SIZE",
+        "_LENGTH",
+        "_INTERVAL",
+        "_RETRIES",
+        "_PORT",
+        "_HOST",
+        "_URL",
+        "_PATH",
+        "_ENABLED",
+        "_DISABLED",
+        "_MODE",
+        "_LEVEL",
+        "_FORMAT",
+    }
+)
+
 # Config file patterns to scan
 _CONFIG_GLOBS = [
     "docker-compose.yml",
@@ -257,14 +294,21 @@ class ConfigAuditor:
 
     def _check_env_secrets(self, path: Path, content: str) -> list[Finding]:
         """Check for hardcoded API keys or tokens in .env files."""
+        # Template and test env files are not production — skip entirely
+        if path.name in _TEMPLATE_SUFFIXES:
+            return []
+
         findings: list[Finding] = []
         secret_pattern = re.compile(
-            r"^((?:\w*(?:API_KEY|SECRET|TOKEN|PASSWORD))\w*)\s*=\s*(.+)$",
+            r"^((?:\w*(?:API_KEY|SECRET|TOKEN|PASSWORD))\w*)\s*=\s*(.*)$",
             re.MULTILINE,
         )
         placeholders = {
             "",
             "changeme",
+            "changethis",
+            "replace-me",
+            "insert-key-here",
             "your-key-here",
             "xxx",
             "CHANGE_ME",
@@ -275,25 +319,45 @@ class ConfigAuditor:
             "test",
             "example",
         }
+        placeholder_prefixes = (
+            "your-",
+            "fake-",
+            "test-",
+            "dummy-",
+            "example-",
+            "replace",
+            "insert",
+            "change",
+            "todo",
+        )
         for match in secret_pattern.finditer(content):
+            key = match.group(1)
+            # Keys whose suffix indicates a non-secret config value
+            if any(key.upper().endswith(suffix) for suffix in _NON_SECRET_KEY_SUFFIXES):
+                continue
             value = match.group(2).strip().strip("\"'")
-            if value and value not in placeholders:
-                line_num = content[: match.start()].count("\n") + 1
-                findings.append(
-                    Finding(
-                        rule_id="AW-CFG-hardcoded-secret",
-                        title=f"Hardcoded secret in {path.name}: {match.group(1)}",
-                        severity=Severity.HIGH,
-                        category=Category.MEMORY,
-                        description=(
-                            f"Secret '{match.group(1)}' has a hardcoded value. "
-                            "This may be committed to version control."
-                        ),
-                        file=path,
-                        line=line_num,
-                        fix="Use environment variables or a secret manager. Never commit secrets.",
-                    )
+            # Empty or known placeholder exact matches
+            if not value or value in placeholders:
+                continue
+            # Values with placeholder prefixes (case-insensitive)
+            if value.lower().startswith(placeholder_prefixes):
+                continue
+            line_num = content[: match.start()].count("\n") + 1
+            findings.append(
+                Finding(
+                    rule_id="AW-CFG-hardcoded-secret",
+                    title=f"Hardcoded secret in {path.name}: {key}",
+                    severity=Severity.HIGH,
+                    category=Category.MEMORY,
+                    description=(
+                        f"Secret '{key}' has a hardcoded value. "
+                        "This may be committed to version control."
+                    ),
+                    file=path,
+                    line=line_num,
+                    fix="Use environment variables or a secret manager. Never commit secrets.",
                 )
+            )
         return findings
 
     def _check_docker_compose(self, path: Path, content: str) -> list[Finding]:

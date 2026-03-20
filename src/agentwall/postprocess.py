@@ -22,6 +22,9 @@ _SEVERITY_RANK: dict[Severity, int] = {
 _TEST_DIRS = frozenset({"tests", "test"})
 _EXAMPLE_DIRS = frozenset({"examples", "example", "docs"})
 
+_ENV_TEMPLATE_NAMES = frozenset({".env.template", ".env.default", ".env.example", ".env.sample"})
+_ENV_TEST_NAMES = frozenset({".env.test", ".env.dev"})
+
 
 def classify_file_context(file_path: Path | None) -> str | None:
     """Classify a file path as test/example context, or None."""
@@ -29,6 +32,10 @@ def classify_file_context(file_path: Path | None) -> str | None:
         return None
     name = file_path.name
     parts = file_path.parts
+    if name in _ENV_TEMPLATE_NAMES:
+        return "template"
+    if name in _ENV_TEST_NAMES:
+        return "test file"
     if any(p in _TEST_DIRS for p in parts) or name.startswith("test_") or name.endswith("_test.py"):
         return "test file"
     if any(p in _EXAMPLE_DIRS for p in parts) or name.endswith(".example"):
