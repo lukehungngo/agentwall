@@ -62,27 +62,21 @@ class MemoryAnalyzer:
         return findings
 
     @staticmethod
-    def _get_engine_isolation(ctx: AnalysisContext) -> dict[tuple[str, int | None], str]:
-        """Get isolation strategy per store instance from engine store profiles."""
-        result: dict[tuple[str, int | None], str] = {}
+    def _get_engine_isolation(ctx: AnalysisContext) -> dict[str, str]:
+        """Get isolation strategy per backend from engine store profiles."""
+        result: dict[str, str] = {}
         profiles = getattr(ctx, "store_profiles", None)
         if not profiles:
             return result
         try:
             for profile in profiles:
-                if profile.file is not None:
-                    key: tuple[str, int | None] = (str(profile.file), profile.line)
-                    result[key] = profile.isolation_strategy.value
-                # Also store by backend as fallback
-                result[("__backend__", profile.backend)] = profile.isolation_strategy.value
+                result[profile.backend] = profile.isolation_strategy.value
         except Exception:  # noqa: BLE001
             pass
         return result
 
     def _check(
-        self,
-        mc: MemoryConfig,
-        engine_isolation: dict[tuple[str, int | None], str] | None = None,
+        self, mc: MemoryConfig, engine_isolation: dict[str, str] | None = None
     ) -> list[Finding]:
         findings: list[Finding] = []
 
@@ -94,10 +88,7 @@ class MemoryAnalyzer:
         # AW-MEM-001: no isolation AND no retrieval filter (vector stores only)
         # HIGH confidence — direct pattern match (no filter kwarg observed)
         if not is_memory_class and no_isolation and no_filter:
-            _ei = engine_isolation or {}
-            iso = _ei.get((str(mc.source_file), mc.source_line), "")
-            if not iso:
-                iso = _ei.get(("__backend__", mc.backend), "")
+            iso = (engine_isolation or {}).get(mc.backend, "")
             if iso == "filter_on_read":
                 pass  # suppressed — engine confirmed all reads carry tenant filter
             elif iso == "collection_per_tenant":
@@ -117,14 +108,7 @@ class MemoryAnalyzer:
                     )
                 )
             else:
-                # No isolation detected — fire as HIGH (not CRITICAL).
-                # Only L3 taint analysis can promote to CRITICAL when it confirms
-                # user identity doesn't reach the filter.
-                findings.append(
-                    _finding_from_rule(AW_MEM_001, mc, ConfidenceLevel.MEDIUM).model_copy(
-                        update={"severity": Severity.HIGH}
-                    )
-                )
+                findings.append(_finding_from_rule(AW_MEM_001, mc, ConfidenceLevel.HIGH))
 
         # AW-MEM-002: has write metadata BUT no retrieval filter (false sense of security)
         # HIGH confidence — concrete mismatch between write and read paths
