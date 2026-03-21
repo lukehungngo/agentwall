@@ -27,7 +27,7 @@ class RAGAnalyzer:
     depends_on: Sequence[str] = ("L0-versions",)
     replace: bool = False
     opt_in: bool = False
-    framework_agnostic: bool = False
+    framework_agnostic: bool = True
 
     def analyze(self, ctx: AnalysisContext) -> list[Finding]:
         findings: list[Finding] = []

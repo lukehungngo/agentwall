@@ -15,7 +15,34 @@ FIXTURES = Path(__file__).parent / "fixtures"
 class TestAgentArchAnalyzer:
     def test_name_and_flags(self) -> None:
         assert AgentArchAnalyzer.name == "L2-agent"
-        assert AgentArchAnalyzer.framework_agnostic is False
+        assert AgentArchAnalyzer.framework_agnostic is True
+
+
+class TestAgentArchAnalyzerAgnostic:
+    """AgentArchAnalyzer must fire on projects without a framework adapter."""
+
+    def test_fires_without_spec(self) -> None:
+        fixture = FIXTURES / "agnostic_agent"
+        ctx = AnalysisContext(
+            target=fixture,
+            config=ScanConfig(),
+            spec=None,
+            source_files=list(fixture.glob("*.py")),
+        )
+        findings = AgentArchAnalyzer().analyze(ctx)
+        assert len(findings) > 0, "AgentArchAnalyzer should find issues without adapter"
+
+    def test_detects_mixed_tools_without_spec(self) -> None:
+        fixture = FIXTURES / "agnostic_agent"
+        ctx = AnalysisContext(
+            target=fixture,
+            config=ScanConfig(),
+            spec=None,
+            source_files=list(fixture.glob("*.py")),
+        )
+        findings = AgentArchAnalyzer().analyze(ctx)
+        rule_ids = {f.rule_id for f in findings}
+        assert "AW-AGT-003" in rule_ids or "AW-AGT-004" in rule_ids
 
     def test_detects_inherited_tools(self) -> None:
         fixture = FIXTURES / "agent_unsafe"

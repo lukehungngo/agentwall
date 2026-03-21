@@ -23,7 +23,34 @@ def _make_ctx(fixture: Path) -> AnalysisContext:
 class TestRAGAnalyzerMeta:
     def test_name_and_flags(self) -> None:
         assert RAGAnalyzer.name == "L1-rag"
-        assert RAGAnalyzer.framework_agnostic is False
+        assert RAGAnalyzer.framework_agnostic is True
+
+
+class TestRAGAnalyzerAgnostic:
+    """RAGAnalyzer must fire on projects without a framework adapter."""
+
+    def test_fires_without_spec(self) -> None:
+        fixture = FIXTURES / "agnostic_rag"
+        ctx = AnalysisContext(
+            target=fixture,
+            config=ScanConfig(),
+            spec=None,
+            source_files=list(fixture.glob("*.py")),
+        )
+        findings = RAGAnalyzer().analyze(ctx)
+        assert len(findings) > 0, "RAGAnalyzer should find issues without adapter"
+
+    def test_detects_persist_directory_without_spec(self) -> None:
+        fixture = FIXTURES / "agnostic_rag"
+        ctx = AnalysisContext(
+            target=fixture,
+            config=ScanConfig(),
+            spec=None,
+            source_files=list(fixture.glob("*.py")),
+        )
+        findings = RAGAnalyzer().analyze(ctx)
+        rag_003 = [f for f in findings if f.rule_id == "AW-RAG-003"]
+        assert len(rag_003) >= 1, "Should detect persist_directory without adapter"
 
 
 class TestRAGAnalyzerUnsafe:
