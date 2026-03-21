@@ -5,6 +5,8 @@ paths:
 
 # Probe Development
 
+Probes are for `--live` mode only. They connect to real vector store instances and verify isolation at runtime.
+
 ## Build priority
 
 ```
@@ -23,3 +25,8 @@ Every probe module must:
 - Register itself in `PROBE_REGISTRY` in `probes/__init__.py`
 - Import SDK dependencies lazily inside `probe_live()` only
 - Return `ProbeResult` with appropriate severity
+
+## Invariants
+
+- **Lazy SDK imports.** Probe SDKs only imported inside `probe_live()`. Default install has zero vector store dependencies.
+- **`--live` requires extras.** `pip install agentwall[chroma]` for live probing.

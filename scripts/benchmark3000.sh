@@ -1717,18 +1717,39 @@ NOT_DETECTED_REASONS = {
 
 # ── Category definitions for report grouping ─────────────────────────
 
-CATEGORIES = [
-    ("tier1-langchain",    "Tier 1 — LangChain Ecosystem (>2k stars)"),
-    ("llamaindex",         "Tier 2 — LlamaIndex Ecosystem"),
-    ("multi-agent",        "Tier 3 — Multi-Agent Frameworks"),
-    ("rag-app",            "Tier 4 — RAG Applications"),
-    ("vector-store",       "Tier 5 — Vector Store Ecosystems"),
-    ("memory-knowledge",   "Tier 6 — Memory & Knowledge Systems"),
-    ("chatbot-assistant",  "Tier 7 — Chatbot / Assistant Frameworks"),
-    ("code-dev-agent",     "Tier 8 — Code / Dev Agents"),
-    ("production-platform","Tier 9 — Production Agent Platforms"),
-    ("tier2-small",        "Tier 10 — Small / Niche Projects"),
-]
+# Map raw category tags → display group labels.
+_CAT_TAG_TO_LABEL = {
+    "tier1-langchain":    "Tier 1 — LangChain Ecosystem (>2k stars)",
+    "langchain":          "Tier 2 — LangChain Extended",
+    "llamaindex":         "Tier 3 — LlamaIndex Core",
+    "llamaindex-small":   "Tier 4 — LlamaIndex Extended",
+    "llamaindex-rag":     "Tier 4 — LlamaIndex Extended",
+    "llamaindex-prod":    "Tier 4 — LlamaIndex Extended",
+    "llamaindex-agent":   "Tier 4 — LlamaIndex Extended",
+    "llamaindex-chatbot": "Tier 4 — LlamaIndex Extended",
+    "llamaindex-eval":    "Tier 4 — LlamaIndex Extended",
+    "crewai":             "Tier 5 — CrewAI Ecosystem",
+    "crewai-small":       "Tier 5 — CrewAI Ecosystem",
+    "crewai-multiagent":  "Tier 5 — CrewAI Ecosystem",
+    "crewai-workflow":    "Tier 5 — CrewAI Ecosystem",
+    "crewai-app":         "Tier 5 — CrewAI Ecosystem",
+    "multi-agent":        "Tier 6 — Multi-Agent Frameworks",
+    "agent":              "Tier 6 — Multi-Agent Frameworks",
+    "autogen":            "Tier 6 — Multi-Agent Frameworks",
+    "openai-agents":      "Tier 7 — OpenAI Agents SDK",
+    "pydantic-ai":        "Tier 8 — Pydantic AI",
+    "graphrag":           "Tier 9 — GraphRAG",
+    "dspy":               "Tier 10 — DSPy",
+    "rag-app":            "Tier 11 — RAG Applications",
+    "rag":                "Tier 11 — RAG Applications",
+    "vector-store":       "Tier 12 — Vector Store Ecosystems",
+    "vectorstore":        "Tier 12 — Vector Store Ecosystems",
+    "memory-knowledge":   "Tier 13 — Memory & Knowledge Systems",
+    "chatbot-assistant":  "Tier 14 — Chatbot / Assistant Frameworks",
+    "code-dev-agent":     "Tier 15 — Code / Dev Agents",
+    "production-platform":"Tier 16 — Production Agent Platforms",
+    "tier2-small":        "Tier 17 — Small / Niche Projects",
+}
 
 # ── Load all results ─────────────────────────────────────────────────
 
@@ -1774,6 +1795,25 @@ for key, meta_str in REPO_META.items():
 # Respect registration order
 repo_order_raw = os.environ.get("REPO_ORDER", "")
 REPO_ORDER = [x for x in repo_order_raw.split(",") if x] if repo_order_raw else sorted(projects.keys())
+
+# Build ordered list of (label, [tags]) preserving tier order.
+_label_order = []
+_label_tags = {}
+for tag, label in _CAT_TAG_TO_LABEL.items():
+    if label not in _label_tags:
+        _label_order.append(label)
+        _label_tags[label] = []
+    _label_tags[label].append(tag)
+
+# Catch-all: any category not mapped above
+_ALL_CATS = {p.get("category") for p in projects.values() if p.get("category")}
+for unk in sorted(_ALL_CATS - set(_CAT_TAG_TO_LABEL)):
+    label = f"Other — {unk}"
+    _label_order.append(label)
+    _label_tags[label] = [unk]
+
+# CATEGORIES as list of (label, tags_set) for the report loop
+CATEGORIES = [(label, set(_label_tags[label])) for label in _label_order]
 
 
 def extract_vectors(findings):
@@ -1823,8 +1863,8 @@ all_rules = defaultdict(int)
 category_stats = []  # (label, findings, crit, high, files, scanned, with_findings)
 
 section_num = 1
-for cat_key, cat_label in CATEGORIES:
-    cat_projects = [k for k in REPO_ORDER if projects.get(k, {}).get("category") == cat_key]
+for cat_label, cat_tags in CATEGORIES:
+    cat_projects = [k for k in REPO_ORDER if projects.get(k, {}).get("category") in cat_tags]
     if not cat_projects:
         continue
 

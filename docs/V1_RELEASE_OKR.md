@@ -6,44 +6,48 @@
 
 ---
 
-## Current State Assessment (2026-03-21, post-BENCHMARK3000)
+## Current State Assessment (2026-03-21, post-BENCHMARK3000 full re-run)
 
-| Dimension          | Reality                                                      | Production Standard            | Gap      |
-| ------------------ | ------------------------------------------------------------ | ------------------------------ | -------- |
-| Framework adapters | **6 (LangChain, LlamaIndex, CrewAI, OpenAI Agents, AutoGen, vectorstore_direct)** | 5+ with deep analysis | **Done** |
-| FP rate            | **~5.7% estimated** (path-based, 2741 findings, 157 est FP) | <15%                           | **Met**  |
-| Engine integration | IsolationEvidence drives MEM findings                        | Engine drives all findings     | **Done** |
-| Detection coverage | **290/362 projects get findings (80%)**                      | >85%                           | Medium   |
-| Zero-finding rate  | **20% overall** (72 zero-finding after P0 fix)               | <10% for vector-store projects | Medium   |
-| CI/CD              | **action.yml created, SARIF upload**                         | GitHub Action + SARIF upload   | **Done** |
-| Documentation      | **README updated, docs/rules.md, CLI explain/rules**         | Full docs                      | **Done** |
-| Test coverage      | **85% (808 tests)**                                          | >85%                           | **Done** |
-| Code quality       | **0 ruff, 0 mypy errors**                                    | ruff clean, mypy strict        | **Done** |
+| Dimension          | Reality                                                      | Production Standard            | Gap          |
+| ------------------ | ------------------------------------------------------------ | ------------------------------ | ------------ |
+| Framework adapters | **6 (LangChain, LlamaIndex, CrewAI, OpenAI Agents, AutoGen, vectorstore_direct)** | 5+ with deep analysis | **Done**     |
+| FP rate            | **~28% estimated** (manual triage on 5 rules, 15% est. for rest) | <15%                       | **NOT MET**  |
+| Engine integration | IsolationEvidence drives MEM findings                        | Engine drives all findings     | **Done**     |
+| Detection coverage | **380/480 projects get findings (79%)**                      | >85%                           | Medium       |
+| Zero-finding rate  | **21% overall** (100 zero-finding)                           | <10% for vector-store projects | Medium       |
+| CI/CD              | **action.yml created, SARIF upload**                         | GitHub Action + SARIF upload   | **Done**     |
+| Documentation      | **README updated, docs/rules.md, CLI explain/rules**         | Full docs                      | **Done**     |
+| Test coverage      | **85% (808 tests)**                                          | >85%                           | **Done**     |
+| Code quality       | **0 ruff, 0 mypy errors**                                    | ruff clean, mypy strict        | **Done**     |
 
-### BENCHMARK3000 Results (349 projects, 2026-03-21)
+### BENCHMARK3000 Results (486 projects, 2026-03-21, fresh re-run)
 
-| Metric                 | Value                                   |
-| ---------------------- | --------------------------------------- |
-| Projects registered    | 349                                     |
-| Projects scanned       | 344                                     |
-| Projects with findings | 247 (72%)                               |
-| Total findings         | 2,001                                   |
-| CRITICAL               | 68                                      |
-| HIGH                   | 493                                     |
-| Estimated FP rate      | **3.2%** (64 estimated false positives) |
-| Scan timeouts          | 0                                       |
+| Metric                 | Value                                            |
+| ---------------------- | ------------------------------------------------ |
+| Projects registered    | 486                                              |
+| Projects scanned       | 480                                              |
+| Projects with findings | 380 (79%)                                        |
+| Total files scanned    | 48,618                                           |
+| Total findings         | 3,679                                            |
+| CRITICAL               | 139                                              |
+| HIGH                   | 1,900                                            |
+| Estimated FP rate      | **~28%** (~1,037 est. FP, manual triage + 15% est.) |
 
-### FP Rate by Rule (automated path-based estimation)
+### FP Rate by Rule (manual triage where available)
 
-| Rule                    | Count | Est FP | FP%   | Status                 |
-| ----------------------- | ----- | ------ | ----- | ---------------------- |
-| AW-MEM-001              | 217   | 0      | 0.0%  | **Fixed** — was 100%   |
-| AW-MEM-003              | 270   | 3      | 1.1%  | Good                   |
-| AW-SEC-001              | 203   | 8      | 3.9%  | Good                   |
-| AW-CFG-hardcoded-secret | 53    | 3      | 5.7%  | **Fixed** — was 75%    |
-| AW-SEC-003              | 84    | 10     | 11.9% | **Fixed** — was 53%    |
-| AW-SER-003              | 234   | 39     | 16.7% | Needs 4 AST heuristics |
-| All others              | 940   | 1      | 0.1%  | Clean                  |
+| Rule                    | Count | Sampled | TP | FP | FP%        | Status                                |
+| ----------------------- | ----- | ------- | -- | -- | ---------- | ------------------------------------- |
+| AW-MEM-001              | 323   | 13      | 0  | 13 | **100%**   | Scanning library code, not user code  |
+| AW-MEM-005              | 95    | 9       | 2  | 7  | **78%**    | Needs retrieval-to-sink path evidence |
+| AW-CFG-hardcoded-secret | 70    | 16      | 4  | 12 | **75%**    | Needs template/placeholder filtering  |
+| AW-SEC-003              | 124   | 30      | 14 | 16 | **53%**    | Too broad on DEBUG logging detection  |
+| AW-SER-003              | 227   | 30      | 16 | 14 | **47%**    | 4 heuristics added, needs re-triage   |
+| AW-MEM-003              | 539   | —       | —  | —  | ~15% est.  | Not triaged                           |
+| AW-TOOL-002             | 396   | —       | —  | —  | ~15% est.  | Not triaged                           |
+| AW-TOOL-004             | 287   | —       | —  | —  | ~15% est.  | Not triaged                           |
+| All others              | 1,618 | —       | —  | —  | ~15% est.  | Not triaged                           |
+
+**Note:** Previous OKR version used path-based FP estimation (only flagging findings in test/example/docs paths). That method reported "0.0% FP" for MEM-001 and "3.2% overall" — both misleading. Manual triage is the ground truth.
 
 ### Framework Detection & Adapter Coverage (349 projects)
 
@@ -92,29 +96,28 @@
 
 ---
 
-## Objective 1: Make Findings Trustworthy (FP < 15%) — DONE
+## Objective 1: Make Findings Trustworthy (FP < 15%) — NOT MET
 
 **Why first:** Nobody adopts a scanner that cries wolf.
 
-| KR    | Metric                       | Before    | After                     | Target   | Required | Status                                          |
-| ----- | ---------------------------- | --------- | ------------------------- | -------- | -------- | ----------------------------------------------- |
-| KR1.1 | MEM-001 FP rate              | 100%      | **0.0%**                  | <20%     | Yes      | **Done**                                        |
-| KR1.2 | SEC-003 FP rate              | 53%       | **11.9%**                 | <20%     | Yes      | **Done**                                        |
-| KR1.3 | CFG-hardcoded-secret FP rate | 75%       | **5.7%**                  | <15%     | Yes      | **Done**                                        |
-| KR1.4 | SER-003 FP rate              | 47%       | **<10% est.** (was 16.7%) | <25%     | Yes      | **Done** — 4 AST heuristics: f-string prefix, config attribute, try/except guard, .format() |
-| KR1.5 | Overall FP rate              | ~35%      | **3.2%**                  | <15%     | Yes      | **Done** — overall target met                   |
-| KR1.6 | Engine drives findings       | Not wired | IsolationEvidence primary | 100% MEM | Yes      | **Done**                                        |
+| KR    | Metric                       | Before | After (manual triage)      | Target   | Required | Status                                          |
+| ----- | ---------------------------- | ------ | -------------------------- | -------- | -------- | ----------------------------------------------- |
+| KR1.1 | MEM-001 FP rate              | 100%   | **100%** (13/13 sampled)   | <20%     | Yes      | **NOT MET** — scanning library code, not user code |
+| KR1.2 | SEC-003 FP rate              | 53%    | **53%** (16/30 sampled)    | <20%     | Yes      | **NOT MET** — too broad on DEBUG logging        |
+| KR1.3 | CFG-hardcoded-secret FP rate | 75%    | **75%** (12/16 sampled)    | <15%     | Yes      | **NOT MET** — needs template/placeholder filter |
+| KR1.4 | SER-003 FP rate              | 47%    | **47%** (14/30 sampled)    | <25%     | Yes      | **NOT MET** — 4 heuristics added but not re-triaged |
+| KR1.5 | Overall FP rate              | ~35%   | **~28%** (1037/3679 est.)  | <15%     | Yes      | **NOT MET** — MEM-001 alone is 323 FPs          |
+| KR1.6 | Engine drives findings       | None   | IsolationEvidence primary  | 100% MEM | Yes      | **Done**                                        |
 
-### KR1.4 Detail: SER-003 Remaining Fix
+**Correction note (2026-03-21):** Previous version of this OKR claimed KR1.1–KR1.5 were "Done" using path-based FP estimation (only counting findings in test/example/docs paths as FP). That methodology is misleading — a finding in production code can still be a false positive. Manual triage of actual source code is the ground truth. The real numbers above come from the manual triage in BENCHMARK3000.md Section 20.
 
-The 39 estimated FP fall into 4 AST-local patterns (no interprocedural taint needed):
+### Top FP Offenders (fix priority for O1)
 
-1. **f-string with constant prefix**: `f"myapp.backends.{name}"` — `ast.JoinedStr` first value is dotted `ast.Constant`
-2. **Config attribute access**: `settings.BACKEND_CLASS` — arg is `ast.Attribute`
-3. **try/except ImportError guard**: guarded imports — walk parents for `ast.Try`
-4. **Constant `.format()` pattern**: `"module.{}".format(name)` — `ast.Call` on `str.format`
-
-~40 LOC addition to `serialization.py`.
+1. **MEM-001** (323 findings, 100% FP) — flagging vectorstore usage in library source code as "no tenant isolation". Need to skip library dirs or require multi-tenant evidence.
+2. **MEM-005** (95 findings, 78% FP) — flagging any retrieval without sanitization. Need retrieval-to-sink path evidence.
+3. **CFG-hardcoded-secret** (70 findings, 75% FP) — matching templates, placeholders, and non-secret config values.
+4. **SEC-003** (124 findings, 53% FP) — too broad on DEBUG-level logging detection.
+5. **SER-003** (227 findings, 47% FP) — 4 AST heuristics were added but triage was done before the fix. Needs re-triage.
 
 ---
 
@@ -279,20 +282,20 @@ STEP 5: O5 — Package + Launch
 
 **Do NOT release until ALL of these are true:**
 
-- [x] FP rate <15% on benchmark (3.2% achieved)
+- [ ] FP rate <15% on benchmark — **BLOCKING: currently ~28% (manual triage). MEM-001 alone is 100% FP (323 findings).**
 - [x] 3+ frameworks with full analysis (LangChain + LlamaIndex + CrewAI)
 - [x] Engine StoreProfile is the primary decision source for MEM rules
-- [x] RAG + AGT + MEM + TOOL rules fire on any Python project (framework-agnostic) — Done: 291/345 projects get findings
+- [x] RAG + AGT + MEM + TOOL rules fire on any Python project (framework-agnostic) — 380/480 projects get findings
 - [x] 6 frameworks with adapters (LangChain, LlamaIndex, CrewAI, OpenAI Agents, AutoGen, vectorstore_direct)
-- [x] 380 of 480 benchmark projects get findings (79%) — 486 projects registered, target was 300+
-- [x] SER-003 FP rate <25% (4 AST heuristics implemented)
-- [x] GitHub Action created (`action.yml`) — needs testing on 3 real repos before marketplace publish
+- [x] 380 of 480 benchmark projects get findings (79%)
+- [ ] SER-003 FP rate <25% — **BLOCKING: currently 47% (14/30 sampled FP). Heuristics added but not verified.**
+- [x] GitHub Action created (`action.yml`)
 - [x] README quickstart updated with correct badges and framework table
 - [x] Every rule has description, severity, fix guidance (CLI `explain` + `docs/rules.md`)
 - [x] `pip install agentwall && agentwall scan . --format sarif` verified in tests + CI
 - [x] 808 tests passing, 85% coverage, ruff clean, mypy strict
 - [x] CI runs on Python 3.10 / 3.11 / 3.12
-- [x] No known P0 issues in the issue tracker
+- [ ] No known P0 issues — **BLOCKING: MEM-001 100% FP is a P0 trust issue**
 
 ---
 
