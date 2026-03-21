@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AgentWall Benchmark 3000 — comprehensive scan of 367 AI agent projects
+# AgentWall Benchmark 3000 — comprehensive scan of ~570 AI agent projects
 # Usage: ./scripts/benchmark3000.sh [targets_dir] [results_dir]
 # macOS: brew install bash coreutils && /opt/homebrew/bin/bash scripts/benchmark3000.sh
 #
@@ -969,6 +969,260 @@ reg rag-chatbot-umbertogriffo "https://github.com/umbertogriffo/rag-chatbot.git"
     "RAG chatbot from documents" "~393" "rag"
 reg local-rag "https://github.com/jonfairbanks/local-rag.git" \
     "Local RAG with open-source LLMs" "~735" "rag"
+
+# === Batch 3: 203 new AI agent/RAG repos (added 2026-03-21, post-review) ===
+
+# --- LangChain (26) ---
+reg fastapi-langgraph-agent "https://github.com/wassim249/fastapi-langgraph-agent-production-ready-template.git" \
+    "Production-ready FastAPI + LangGraph" "~2k" "langchain"
+reg rag-tutorial-v2 "https://github.com/pixegami/rag-tutorial-v2.git" \
+    "LangChain RAG Tutorial v2" "~937" "langchain"
+reg deepmcpagent "https://github.com/cryxnet/DeepMCPAgent.git" \
+    "LangGraph agents with MCP tools" "~810" "langchain"
+reg haste171-langchain-chatbot "https://github.com/Haste171/langchain-chatbot.git" \
+    "AI Chatbot with LangChain" "~436" "langchain"
+reg chatgpt-smart-speaker "https://github.com/Olney1/ChatGPT-OpenAI-Smart-Speaker.git" \
+    "Smart Speaker with LangChain agents" "~311" "langchain"
+reg aws-bedrock-langchain-agent "https://github.com/aws-samples/generative-ai-amazon-bedrock-langchain-agent-example.git" \
+    "AWS Bedrock LangChain agent" "~261" "langchain"
+reg llamabot "https://github.com/KodyKendall/LlamaBot.git" \
+    "AI Coding Agent with LangGraph" "~242" "langchain"
+reg langchainbitcoin "https://github.com/lightninglabs/LangChainBitcoin.git" \
+    "LangChain agents for Bitcoin" "~143" "langchain"
+reg langgraph-agents-template "https://github.com/panaversity/langgraph-agents-template.git" \
+    "Multi-agent LangGraph template" "~95" "langchain"
+reg langchain-ollama-chainlit "https://github.com/sudarshan-koirala/langchain-ollama-chainlit.git" \
+    "Chat with docs using LangChain+Ollama" "~83" "langchain"
+reg aurora-incident "https://github.com/Arvo-AI/aurora.git" \
+    "Agentic incident management LangGraph" "~76" "langchain"
+reg gpt4-langchain-research "https://github.com/petermartens98/GPT4-LangChain-Internet-Research-Agent-App.git" \
+    "GPT4 LangChain research agent" "~74" "langchain"
+reg math-app-langchain "https://github.com/tahreemrasul/math_app_langchain.git" \
+    "Math chatbot LangChain agents" "~70" "langchain"
+reg finchbot "https://github.com/xt765/FinchBot.git" \
+    "AI Agent framework LangChain+LangGraph" "~67" "langchain"
+reg uipath-langchain "https://github.com/UiPath/uipath-langchain-python.git" \
+    "UiPath LangGraph agents" "~67" "langchain"
+reg langchain-weaviate "https://github.com/langchain-ai/langchain-weaviate.git" \
+    "LangChain Weaviate integration" "~63" "langchain"
+reg langchain-stock-screener "https://github.com/jbpayton/langchain-stock-screener.git" \
+    "LangChain stock screening agent" "~44" "langchain"
+reg git-agent "https://github.com/jupyterjazz/git-agent.git" \
+    "LangChain agent for Git commands" "~44" "langchain"
+reg langchain-neo4j-demo "https://github.com/axolotl0212/langchain-neo4j-knowledge-graph-demo.git" \
+    "LangChain agent + Neo4j memory" "~18" "langchain"
+
+# --- CrewAI (6) ---
+reg crewai-experiments "https://github.com/majacinka/crewai-experiments.git" \
+    "CrewAI experiments with local models" "~1k" "crewai"
+reg crewai-hierarchical "https://github.com/bhancockio/crewai-updated-tutorial-hierarchical.git" \
+    "CrewAI hierarchical tutorial" "~176" "crewai"
+reg automate-youtube-crewai "https://github.com/bhancockio/automate-youtube-with-crewai.git" \
+    "Automate YouTube with CrewAI" "~171" "crewai"
+reg crewai-rag-deep-dive "https://github.com/bhancockio/crewai-rag-deep-dive.git" \
+    "CrewAI RAG deep dive" "~152" "crewai"
+reg agency-swarm-tutorial "https://github.com/john-adeojo/agency_swarm_tutorial.git" \
+    "Agency Swarm tutorial" "~72" "crewai"
+
+# --- OpenAI Agents (6) ---
+reg fableforge "https://github.com/e-johnstonn/FableForge.git" \
+    "OpenAI function calling + Deep Lake" "~357" "openai-agents"
+reg python-mcp-server-client "https://github.com/GobinFan/python-mcp-server-client.git" \
+    "MCP server multi-framework" "~154" "openai-agents"
+reg openai-function-calling "https://github.com/jakecyr/openai-function-calling.git" \
+    "OpenAI function calling helpers" "~82" "openai-agents"
+reg openai-functools "https://github.com/Jakob-98/openai-functools.git" \
+    "OpenAI Functions JSON metadata" "~70" "openai-agents"
+reg financial-agent "https://github.com/hellotinah/financial_agent.git" \
+    "Financial agent OpenAI SDK" "~35" "openai-agents"
+reg portfolio-research-team "https://github.com/madebyagents/portfolio-research-team.git" \
+    "Multi-agent investment research" "~27" "openai-agents"
+
+# --- RAG (55) ---
+reg production-agentic-rag-course "https://github.com/jamwithai/production-agentic-rag-course.git" \
+    "Production agentic RAG course" "~4.3k" "rag"
+reg llm-twin-course "https://github.com/decodingml/llm-twin-course.git" \
+    "Production LLM+RAG with LLMOps" "~4.3k" "rag"
+reg chatrtx "https://github.com/NVIDIA/ChatRTX.git" \
+    "NVIDIA RAG chatbots Windows" "~3.1k" "rag"
+reg yt-fts "https://github.com/NotJoeMartinez/yt-fts.git" \
+    "YouTube Full Text Search CLI" "~1.8k" "rag"
+reg minima "https://github.com/dmayboroda/minima.git" \
+    "On-premises conversational RAG" "~1k" "rag"
+reg context-portal "https://github.com/GreatScottyMac/context-portal.git" \
+    "MCP knowledge graph RAG" "~758" "rag"
+reg flare "https://github.com/jzbjyb/FLARE.git" \
+    "Forward-Looking Active REtrieval" "~666" "rag"
+reg vidorag "https://github.com/Alibaba-NLP/ViDoRAG.git" \
+    "Visual Document RAG agents" "~645" "rag"
+reg rankify "https://github.com/DataScienceUIBK/Rankify.git" \
+    "RAG retrieval + re-ranking toolkit" "~600" "rag"
+reg hirag "https://github.com/hhy-huang/HiRAG.git" \
+    "Hierarchical knowledge RAG" "~525" "rag"
+reg vrag "https://github.com/Alibaba-NLP/VRAG.git" \
+    "Multimodal RAG Framework" "~486" "rag"
+reg crag "https://github.com/HuskyInSalt/CRAG.git" \
+    "Corrective RAG" "~448" "rag"
+reg neuml-rag "https://github.com/neuml/rag.git" \
+    "RAG with txtai" "~445" "rag"
+reg mindsql "https://github.com/Mindinventory/MindSQL.git" \
+    "Text-to-SQL RAG with ChromaDB+FAISS" "~438" "rag"
+reg second-brain "https://github.com/henrydaum/second-brain.git" \
+    "Personal knowledge base RAG" "~437" "rag"
+reg multihop-rag "https://github.com/yixuantt/MultiHop-RAG.git" \
+    "MultiHop RAG evaluation" "~427" "rag"
+reg agentic-rag-r1 "https://github.com/jiangxinke/Agentic-RAG-R1.git" \
+    "Agentic RAG via RL" "~397" "rag"
+reg llama-github "https://github.com/JetXu-LLM/llama-github.git" \
+    "Agentic RAG from GitHub repos" "~318" "rag"
+reg code-qa "https://github.com/sankalp1999/code_qa.git" \
+    "RAG on codebases with LanceDB" "~283" "rag"
+reg local-llm-with-rag "https://github.com/amscotti/local-LLM-with-RAG.git" \
+    "Local LLM with RAG" "~272" "rag"
+reg diver "https://github.com/AQ-MedAI/Diver.git" \
+    "Complex reasoning agentic RAG" "~252" "rag"
+reg everything-ai "https://github.com/AstraBert/everything-ai.git" \
+    "AI-powered local chatbot" "~250" "rag"
+reg casalioy "https://github.com/su77ungr/CASALIOY.git" \
+    "Air-gapped LLMs toolkit" "~224" "rag"
+reg nexusrag "https://github.com/LeDat98/NexusRAG.git" \
+    "Hybrid RAG vector+graph" "~205" "rag"
+reg ultimaterag "https://github.com/leonyangdev/UltimateRAG.git" \
+    "Naive to Agentic to GraphRAG" "~170" "rag"
+reg searchgpt "https://github.com/Wilson-ZheLin/SearchGPT.git" \
+    "GPT with web browsing" "~169" "rag"
+reg brainchulo "https://github.com/ChuloAI/BrainChulo.git" \
+    "ChromaDB-based memory" "~147" "rag"
+reg multimodal-rag-llama32 "https://github.com/jayrodge/Multimodal-RAG-with-Llama-3.2.git" \
+    "Multimodal RAG with Milvus" "~135" "rag"
+reg ragbase "https://github.com/curiousily/ragbase.git" \
+    "Local RAG with Qdrant" "~122" "rag"
+reg smartrag "https://github.com/itanishqshelar/SmartRAG.git" \
+    "Privacy-first multimodal RAG" "~109" "rag"
+reg drugclaw "https://github.com/QSong-github/DrugClaw.git" \
+    "Agentic RAG for drug intelligence" "~97" "rag"
+reg polyrag "https://github.com/QuentinFuxa/PolyRAG.git" \
+    "Agentic RAG for small LMs" "~92" "rag"
+reg corvus "https://github.com/YS0meone/Corvus.git" \
+    "Multi-agent RAG with Qdrant" "~85" "rag"
+reg local-rag-ollama "https://github.com/ThomasJanssen-tech/Local-RAG-with-Ollama.git" \
+    "Local RAG Ollama+ChromaDB" "~78" "rag"
+reg rag-containers "https://github.com/plaggy/rag-containers.git" \
+    "Containerized RAG with Qdrant" "~76" "rag"
+reg chat-pdf "https://github.com/edrickdch/chat-pdf.git" \
+    "Chat PDF LangChain+ChromaDB" "~71" "rag"
+reg rag-ops "https://github.com/T-Sunm/rag-ops.git" \
+    "RAG ops with cache layers" "~70" "rag"
+reg semantic-mail "https://github.com/yahorbarkouski/semantic-mail.git" \
+    "Semantic search for Gmail" "~69" "rag"
+reg empire-chain "https://github.com/manas95826/empire-chain.git" \
+    "LLMs + vector stores framework" "~66" "rag"
+reg dualstack-agent "https://github.com/Yuliu11/DualStack-Agent.git" \
+    "Agentic RAG FAISS+BM25" "~65" "rag"
+reg search-your-pdf "https://github.com/AIAnytime/Search-Your-PDF-App.git" \
+    "Search PDF LangChain+ChromaDB" "~62" "rag"
+reg vectorverse "https://github.com/abhishek-ch/VectorVerse.git" \
+    "Chat with docs multi-LLM" "~48" "rag"
+reg langchain-pinecone-rag "https://github.com/ThomasJanssen-tech/LangChain-Pinecone-RAG.git" \
+    "LangChain Pinecone RAG" "~47" "rag"
+reg deepsearch-rag "https://github.com/deepsearch-ai/deepsearch.git" \
+    "Multimodal RAG semantic search" "~41" "rag"
+
+# --- Vectorstore (15) ---
+reg docarray "https://github.com/docarray/docarray.git" \
+    "Multimodal data representation" "~3.1k" "vectorstore"
+reg prompttools "https://github.com/hegelai/prompttools.git" \
+    "Prompt testing for LLMs+vector DBs" "~3k" "vectorstore"
+reg mcp-server-qdrant "https://github.com/qdrant/mcp-server-qdrant.git" \
+    "Qdrant MCP server" "~1.3k" "vectorstore"
+reg qdrant-client "https://github.com/qdrant/qdrant-client.git" \
+    "Python Qdrant client" "~1.2k" "vectorstore"
+reg jamaibase "https://github.com/EmbeddedLLM/JamAIBase.git" \
+    "AI spreadsheet with LLM pipelines" "~1.1k" "vectorstore"
+reg automem "https://github.com/verygoodplugins/automem.git" \
+    "Graph-vector memory service" "~668" "vectorstore"
+reg osintgpt "https://github.com/estebanpdl/osintgpt.git" \
+    "OSINT analysis with embeddings" "~498" "vectorstore"
+reg aetherius-ai "https://github.com/libraryofcelsus/Aetherius_AI_Assistant.git" \
+    "AI Assistant with Qdrant" "~314" "vectorstore"
+reg conversational-agent-qdrant "https://github.com/mfmezger/conversational-agent-langchain.git" \
+    "Conversational agent Qdrant" "~247" "vectorstore"
+reg weaviate-python-client "https://github.com/weaviate/weaviate-python-client.git" \
+    "Weaviate Python client" "~217" "vectorstore"
+reg nekoimagegallery "https://github.com/hv0905/NekoImageGallery.git" \
+    "Reverse image search CLIP+Qdrant" "~185" "vectorstore"
+reg document-buddy "https://github.com/AIAnytime/Document-Buddy-App.git" \
+    "Document app Qdrant+BGE" "~151" "vectorstore"
+reg chromadb-chatbot "https://github.com/daveshap/ChromaDB_Chatbot_Public.git" \
+    "ChromaDB chatbot" "~145" "vectorstore"
+reg vectoretl "https://github.com/ContextData/VectorETL.git" \
+    "ETL for vector databases" "~108" "vectorstore"
+reg weaviate-agent-skills "https://github.com/weaviate/agent-skills.git" \
+    "Weaviate Agent Skills" "~69" "vectorstore"
+
+# --- Agent (45) ---
+reg tradingagents "https://github.com/TauricResearch/TradingAgents.git" \
+    "Multi-Agent LLM Trading" "~35k" "agent"
+reg autoagent "https://github.com/HKUDS/AutoAgent.git" \
+    "Zero-Code LLM Agent Framework" "~8.7k" "agent"
+reg praisonai "https://github.com/MervinPraison/PraisonAI.git" \
+    "Low-code multi-agent with memory" "~5.7k" "agent"
+reg agency-swarm "https://github.com/VRSEN/agency-swarm.git" \
+    "Multi-Agent Orchestration" "~4.1k" "agent"
+reg langroid "https://github.com/langroid/langroid.git" \
+    "Multi-Agent Programming LLMs" "~3.9k" "agent"
+reg paper2poster "https://github.com/Paper2Poster/Paper2Poster.git" \
+    "Multi-agent poster generation" "~3.5k" "agent"
+reg deepresearchagent "https://github.com/SkyworkAI/DeepResearchAgent.git" \
+    "Multi-agent deep research" "~3.3k" "agent"
+reg llmstack "https://github.com/trypromptly/LLMStack.git" \
+    "No-code multi-agent framework" "~2.3k" "agent"
+reg agentuniverse "https://github.com/agentuniverse-ai/agentUniverse.git" \
+    "LLM multi-agent framework" "~2.2k" "agent"
+reg comfyui-llm-party "https://github.com/heshengtao/comfyui_LLM_party.git" \
+    "LLM Agent Framework ComfyUI" "~2.1k" "agent"
+reg a-mem "https://github.com/agiresearch/A-mem.git" \
+    "Agentic Memory for LLM Agents" "~926" "agent"
+reg general-agentic-memory "https://github.com/VectorSpaceLab/general-agentic-memory.git" \
+    "General memory for agents" "~832" "agent"
+reg mcp-mem0 "https://github.com/coleam00/mcp-mem0.git" \
+    "MCP long-term agent memory" "~663" "agent"
+reg agency-swarm-lab "https://github.com/VRSEN/agency-swarm-lab.git" \
+    "Agency Swarm experiments" "~629" "agent"
+reg logfire "https://github.com/pydantic/logfire.git" \
+    "AI observability for agents" "~4.1k" "pydantic-ai"
+reg air-framework "https://github.com/feldroy/air.git" \
+    "AI web framework FastAPI+Pydantic" "~840" "pydantic-ai"
+reg airflow-ai-sdk "https://github.com/astronomer/airflow-ai-sdk.git" \
+    "Airflow + Pydantic AI agents" "~523" "pydantic-ai"
+reg pydantic-deepagents "https://github.com/vstorm-co/pydantic-deepagents.git" \
+    "Deep Agent on Pydantic-AI" "~507" "pydantic-ai"
+reg pydanticai-research-agent "https://github.com/coleam00/PydanticAI-Research-Agent.git" \
+    "PydanticAI research agent" "~130" "pydantic-ai"
+reg mongodb-rag-agent "https://github.com/coleam00/MongoDB-RAG-Agent.git" \
+    "MongoDB RAG with Pydantic AI" "~102" "pydantic-ai"
+reg agent-memory-server "https://github.com/redis/agent-memory-server.git" \
+    "Agent memory with Redis" "~207" "agent"
+reg smolagents-examples "https://github.com/samwit/smolagents_examples.git" \
+    "Smolagents framework examples" "~165" "agent"
+reg langroid-examples "https://github.com/langroid/langroid-examples.git" \
+    "Langroid multi-agent examples" "~148" "agent"
+reg agent-memoryforge "https://github.com/hellangleZ/Agent-MemoryForge.git" \
+    "7-layer memory for AI Agents" "~137" "agent"
+reg deepsearchagents "https://github.com/lwyBZss8924d/DeepSearchAgents.git" \
+    "DeepSearch with smolagents" "~136" "agent"
+reg halumem "https://github.com/MemTensor/HaluMem.git" \
+    "Hallucination eval agent memory" "~115" "agent"
+reg openagent-llm "https://github.com/OpenAgentLLM/OpenAgent.git" \
+    "Autonomous agent LLM" "~91" "agent"
+reg llm-agent-memory "https://github.com/AkiRusProd/llm-agent.git" \
+    "LLM with vector DB memory" "~53" "agent"
+
+# --- GraphRAG (2) ---
+reg g-retriever "https://github.com/XiaoxinHe/G-Retriever.git" \
+    "Graph Retriever for QA" "~538" "graphrag"
+reg retrieve-dspy "https://github.com/weaviate/retrieve-dspy.git" \
+    "DSPy+Weaviate retrieval" "~94" "dspy"
 
 # ── Force framework overrides ───────────────────────────────────────────
 
