@@ -25,8 +25,8 @@
   <img src="https://img.shields.io/badge/pypi-v0.1.0-blue?style=flat-square" alt="PyPI version">
   <img src="https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12-blue?style=flat-square" alt="Python versions">
   <a href="https://github.com/lukehungngo/agentwall/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
-  <img src="https://img.shields.io/badge/tests-216%20passing-brightgreen?style=flat-square" alt="Tests">
-  <img src="https://img.shields.io/badge/coverage-72%25-yellow?style=flat-square" alt="Coverage">
+  <img src="https://img.shields.io/badge/tests-781%2B%20passing-brightgreen?style=flat-square" alt="Tests">
+  <img src="https://img.shields.io/badge/coverage-85%25-brightgreen?style=flat-square" alt="Coverage">
 </p>
 
 <!-- TODO: Replace with actual GIF recording of `agentwall scan examples/` -->
@@ -256,10 +256,11 @@ agentwall scan ./project/
 | Framework | Status |
 |---|---|
 | LangChain / LangGraph (v0.2–0.3) | Supported |
-| CrewAI | Planned (Phase 2) |
-| AutoGen | Planned (Phase 2) |
-| LlamaIndex | Planned (Phase 2) |
-| OpenAI Agents SDK | Planned (Phase 4) |
+| CrewAI | Supported |
+| AutoGen | Supported |
+| LlamaIndex | Supported |
+| OpenAI Agents SDK | Supported |
+| Direct vectorstore usage | Supported |
 
 ### Supported vector stores (static detection)
 
@@ -393,7 +394,7 @@ AgentWall covers 10 of the 28 cataloged attack vectors through static analysis. 
 
 ### Where We Are Today (v0.x) ✅
 
-Core static scanner for LangChain + ChromaDB. 9 analysis layers (L0–L8), 10 detection rules, 5 output formats (terminal, JSON, SARIF, agent-json, patch). 216 tests, benchmark across 20 real-world projects (12/20 have confirmed issues). Inter-procedural call graph, config auditing, Semgrep rules, LLM confidence scoring — all shipped. Incremental `verify` command for fast fix-verify loops.
+Core static scanner with 6 framework adapters (LangChain, CrewAI, AutoGen, LlamaIndex, OpenAI Agents SDK, direct vectorstore). 9 analysis layers (L0–L8), 26 detection rules across 7 categories, 5 output formats (terminal, JSON, SARIF, agent-json, patch). 781+ tests at 85% coverage, benchmark across 20 real-world projects (12/20 have confirmed issues). Inter-procedural call graph, config auditing, Semgrep rules, LLM confidence scoring — all shipped. CLI commands: `scan`, `verify`, `rules`, `explain`.
 
 **The v0.x releases establish the foundation. What follows is the full vision for AgentWall as the definitive security layer for every AI agent ever shipped.**
 
@@ -403,11 +404,13 @@ Core static scanner for LangChain + ChromaDB. 9 analysis layers (L0–L8), 10 de
 
 The agent ecosystem is fragmenting across LangChain, OpenAI Agents SDK, CrewAI, AutoGen, and emerging MCP-native agents. A single vulnerability class manifests differently in each framework. v1.0 ships a unified rule engine with per-framework adapters, so one scan command covers your entire polyglot agent codebase.
 
-- [ ] OpenAI Agents SDK adapter (tool registration, handoff permissions, context scope)
-- [ ] CrewAI adapter (crew-level vs. agent-level memory isolation, task permission boundaries)
-- [ ] AutoGen adapter (multi-agent conversation memory, inter-agent trust levels)
+- [x] OpenAI Agents SDK adapter (tool registration, handoff permissions, context scope)
+- [x] CrewAI adapter (crew-level vs. agent-level memory isolation, task permission boundaries)
+- [x] AutoGen adapter (multi-agent conversation memory, inter-agent trust levels)
+- [x] LlamaIndex adapter (index-level memory, retriever patterns)
+- [x] Direct vectorstore adapter (framework-agnostic AST scanning)
 - [ ] MCP tool permission auditing (server-level scope declarations, capability mismatches)
-- [ ] Single `agentwall scan .` works across mixed-framework monorepos
+- [x] Single `agentwall scan .` works across mixed-framework monorepos
 
 ### v1.1 — Agentic Supply Chain Security
 
