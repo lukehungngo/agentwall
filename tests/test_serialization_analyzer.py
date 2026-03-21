@@ -144,7 +144,7 @@ class TestSER003FPSuppressions:
     def test_constant_format_not_flagged(self, tmp_path: Path) -> None:
         (tmp_path / "fmt.py").write_text(
             'import importlib\n'
-            'mod = importlib.import_module("myapp.{}".format(name))\n'
+            'mod = importlib.import_module("myapp.backends.{}".format(name))\n'
         )
         ctx = AnalysisContext(
             target=tmp_path,

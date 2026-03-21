@@ -33,6 +33,7 @@ class SerializationAnalyzer:
 
     def _check_file(self, ctx: AnalysisContext, tree: ast.Module, path: Path) -> list[Finding]:
         safe_vars = self._collect_safe_import_vars(tree)
+        parent_map = self._build_parent_map(tree)
         findings: list[Finding] = []
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
@@ -72,7 +73,7 @@ class SerializationAnalyzer:
                 and not self._is_safe_var_import(node, safe_vars)
                 and not self._is_fstring_with_constant_prefix(node)
                 and not self._is_config_attribute_import(node)
-                and not self._is_try_except_guarded(node, tree)
+                and not self._is_try_except_guarded(node, parent_map)
                 and not self._is_constant_format_call(node)
                 and not ctx.should_suppress(AW_SER_003.rule_id)
             ):
@@ -214,30 +215,48 @@ class SerializationAnalyzer:
         )
 
     @staticmethod
-    def _is_try_except_guarded(node: ast.Call, tree: ast.Module) -> bool:
-        """Suppress when the import call is inside a try/except ImportError block."""
+    def _build_parent_map(tree: ast.Module) -> dict[int, ast.AST]:
+        """Build a child-id → parent map for O(1) ancestor lookups."""
+        parents: dict[int, ast.AST] = {}
         for parent in ast.walk(tree):
-            if not isinstance(parent, ast.Try):
+            for child in ast.iter_child_nodes(parent):
+                parents[id(child)] = parent
+        return parents
+
+    @staticmethod
+    def _is_try_except_guarded(
+        node: ast.Call, parent_map: dict[int, ast.AST]
+    ) -> bool:
+        """Suppress when the import call is inside a try/except ImportError block."""
+        current: ast.AST = node
+        while id(current) in parent_map:
+            current = parent_map[id(current)]
+            if not isinstance(current, ast.Try):
                 continue
-            for handler in parent.handlers:
+            for handler in current.handlers:
                 if handler.type is None:
                     continue
-                handler_name: str | None = None
-                if isinstance(handler.type, ast.Name):
-                    handler_name = handler.type.id
-                elif isinstance(handler.type, ast.Tuple):
-                    handler_name = ",".join(
-                        getattr(e, "id", "") for e in handler.type.elts
-                    )
-                if handler_name and "ImportError" in handler_name:
-                    for child in ast.walk(parent):
-                        if child is node:
-                            return True
+                if isinstance(handler.type, ast.Name) and handler.type.id in {
+                    "ImportError",
+                    "ModuleNotFoundError",
+                }:
+                    return True
+                if isinstance(handler.type, ast.Tuple) and any(
+                    isinstance(e, ast.Name)
+                    and e.id in {"ImportError", "ModuleNotFoundError"}
+                    for e in handler.type.elts
+                ):
+                    return True
         return False
 
     @staticmethod
     def _is_constant_format_call(node: ast.Call) -> bool:
-        """Suppress when arg is "module.{}".format(name) — constant constrains namespace."""
+        """Suppress when arg is "a.b.{}".format(name) — multi-segment prefix constrains namespace.
+
+        Requires >= 2 dots in the constant template, consistent with
+        ``_is_fstring_with_constant_prefix``. Single-dot like ``"plugins.{}".format(x)``
+        is still exploitable because the attacker controls the final segment.
+        """
         if not node.args:
             return False
         arg = node.args[0]
@@ -247,7 +266,7 @@ class SerializationAnalyzer:
             and arg.func.attr == "format"
             and isinstance(arg.func.value, ast.Constant)
             and isinstance(arg.func.value.value, str)
-            and "." in arg.func.value.value
+            and arg.func.value.value.count(".") >= 2
         )
 
     @staticmethod

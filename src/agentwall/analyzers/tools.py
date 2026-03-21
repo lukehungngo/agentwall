@@ -63,8 +63,8 @@ class ToolAnalyzer:
 
     def analyze(self, ctx: AnalysisContext) -> list[Finding]:
         spec = ctx.spec
-        if spec is None or not spec.tools:
-            # No adapter or adapter found no tools — use AST fallback
+        if spec is None:
+            # No adapter matched — use AST fallback
             return self._analyze_agnostic(ctx)
         findings: list[Finding] = []
         for tool in spec.tools:
@@ -87,7 +87,7 @@ class ToolAnalyzer:
         return findings
 
     @staticmethod
-    def _extract_tools_from_ast(source_files: list[Path]) -> list[ToolSpec]:
+    def _extract_tools_from_ast(source_files: Sequence[Path]) -> list[ToolSpec]:
         """Walk source files' ASTs and build synthetic ToolSpec objects."""
         tools: list[ToolSpec] = []
         for fpath in source_files:
@@ -109,11 +109,16 @@ class ToolAnalyzer:
                     for dec in node.decorator_list
                 )
 
-                # Check body for exec/eval/compile and subprocess calls
+                # Check body for exec/eval/compile and subprocess.* calls
                 has_code_exec = any(
                     isinstance(child, ast.Call) and (
                         (isinstance(child.func, ast.Name) and child.func.id in _EXEC_CALLS)
-                        or (isinstance(child.func, ast.Attribute) and child.func.attr in _SUBPROCESS_ATTRS)
+                        or (
+                            isinstance(child.func, ast.Attribute)
+                            and child.func.attr in _SUBPROCESS_ATTRS
+                            and isinstance(child.func.value, ast.Name)
+                            and child.func.value.id == "subprocess"
+                        )
                     )
                     for child in ast.walk(node)
                 )
