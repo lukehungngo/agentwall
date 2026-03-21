@@ -108,6 +108,56 @@ class TestToolAnalyzerTOOL005:
         assert "AW-TOOL-005" not in rule_ids
 
 
+class TestToolAnalyzerAgnostic:
+    """Tests for the AST-based fallback when no framework adapter is available."""
+
+    def test_fires_on_exec_eval(self, tmp_path: Path) -> None:
+        src = tmp_path / "agent.py"
+        src.write_text("def run_code(code):\n    return eval(code)\n", encoding="utf-8")
+        ctx = AnalysisContext(target=tmp_path, config=ScanConfig.default(), source_files=[src])
+        findings = ToolAnalyzer().analyze(ctx)
+        rule_ids = [f.rule_id for f in findings]
+        assert "AW-TOOL-002" in rule_ids
+
+    def test_fires_on_subprocess(self, tmp_path: Path) -> None:
+        src = tmp_path / "agent.py"
+        src.write_text(
+            "import subprocess\ndef run_cmd(cmd):\n    subprocess.run(cmd, shell=True)\n",
+            encoding="utf-8",
+        )
+        ctx = AnalysisContext(target=tmp_path, config=ScanConfig.default(), source_files=[src])
+        findings = ToolAnalyzer().analyze(ctx)
+        rule_ids = [f.rule_id for f in findings]
+        assert "AW-TOOL-002" in rule_ids
+
+    def test_fires_on_tool_decorator(self, tmp_path: Path) -> None:
+        src = tmp_path / "agent.py"
+        src.write_text(
+            "@tool\ndef delete_record(record_id):\n    '''Delete a record.'''\n    pass\n",
+            encoding="utf-8",
+        )
+        ctx = AnalysisContext(target=tmp_path, config=ScanConfig.default(), source_files=[src])
+        findings = ToolAnalyzer().analyze(ctx)
+        rule_ids = [f.rule_id for f in findings]
+        assert "AW-TOOL-001" in rule_ids
+
+    def test_no_findings_on_clean_code(self, tmp_path: Path) -> None:
+        src = tmp_path / "agent.py"
+        src.write_text('def hello():\n    return "world"\n', encoding="utf-8")
+        ctx = AnalysisContext(target=tmp_path, config=ScanConfig.default(), source_files=[src])
+        findings = ToolAnalyzer().analyze(ctx)
+        assert findings == []
+
+    def test_flag_is_agnostic(self) -> None:
+        assert ToolAnalyzer.framework_agnostic is True
+
+    def test_existing_spec_behavior_unchanged(self) -> None:
+        tool = ToolSpec(name="delete_file", is_destructive=True)
+        findings = ToolAnalyzer().analyze(_ctx(_spec(tool)))
+        rule_ids = [f.rule_id for f in findings]
+        assert "AW-TOOL-001" in rule_ids
+
+
 class TestToolAnalyzerNoFindingsOnSafe:
     def test_safe_tool_no_findings(self) -> None:
         tool = ToolSpec(

@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
+import ast
 from collections.abc import Sequence
+from pathlib import Path
 
 from agentwall.context import AnalysisContext
 from agentwall.models import ConfidenceLevel, Finding, ToolSpec
 from agentwall.rules import AW_TOOL_001, AW_TOOL_002, AW_TOOL_003, AW_TOOL_004, AW_TOOL_005, RuleDef
 
 _TOOL_LIMIT = 15
+
+_EXEC_CALLS: frozenset[str] = frozenset({"exec", "eval", "compile"})
+_SUBPROCESS_ATTRS: frozenset[str] = frozenset({"run", "call", "Popen", "check_output", "check_call"})
+_DESTRUCTIVE_KW: frozenset[str] = frozenset({
+    "delete", "remove", "drop", "destroy", "kill", "purge", "erase", "wipe", "truncate",
+})
 
 
 def _finding_from_rule(
@@ -51,12 +59,12 @@ class ToolAnalyzer:
     depends_on: Sequence[str] = ()
     replace: bool = False
     opt_in: bool = False
-    framework_agnostic: bool = False
+    framework_agnostic: bool = True
 
     def analyze(self, ctx: AnalysisContext) -> list[Finding]:
         spec = ctx.spec
         if spec is None:
-            return []
+            return self._analyze_agnostic(ctx)
         findings: list[Finding] = []
         for tool in spec.tools:
             findings.extend(self._check_tool(tool))
@@ -64,6 +72,74 @@ class ToolAnalyzer:
             # LOW confidence — tool count is heuristic
             findings.append(_finding_from_rule_no_loc(AW_TOOL_005, ConfidenceLevel.LOW))
         return findings
+
+    def _analyze_agnostic(self, ctx: AnalysisContext) -> list[Finding]:
+        """AST-based fallback when no framework adapter is available."""
+        tools = self._extract_tools_from_ast(ctx.source_files)
+        if not tools:
+            return []
+        findings: list[Finding] = []
+        for tool in tools:
+            findings.extend(self._check_tool(tool))
+        if len(tools) > _TOOL_LIMIT:
+            findings.append(_finding_from_rule_no_loc(AW_TOOL_005, ConfidenceLevel.LOW))
+        return findings
+
+    @staticmethod
+    def _extract_tools_from_ast(source_files: list[Path]) -> list[ToolSpec]:
+        """Walk source files' ASTs and build synthetic ToolSpec objects."""
+        tools: list[ToolSpec] = []
+        for fpath in source_files:
+            try:
+                source = fpath.read_text(encoding="utf-8")
+                tree = ast.parse(source, filename=str(fpath))
+            except (SyntaxError, UnicodeDecodeError, OSError):
+                continue
+
+            for node in ast.walk(tree):
+                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+
+                # Check for @tool decorator
+                has_tool_decorator = False
+                for dec in node.decorator_list:
+                    if isinstance(dec, ast.Name) and dec.id == "tool":
+                        has_tool_decorator = True
+                    elif isinstance(dec, ast.Call) and isinstance(dec.func, ast.Name) and dec.func.id == "tool":
+                        has_tool_decorator = True
+                    elif isinstance(dec, ast.Attribute) and dec.attr == "tool":
+                        has_tool_decorator = True
+
+                # Check body for exec/eval/compile and subprocess calls
+                has_code_exec = False
+                for child in ast.walk(node):
+                    if isinstance(child, ast.Call):
+                        if isinstance(child.func, ast.Name) and child.func.id in _EXEC_CALLS:
+                            has_code_exec = True
+                        elif (
+                            isinstance(child.func, ast.Attribute)
+                            and child.func.attr in _SUBPROCESS_ATTRS
+                        ):
+                            has_code_exec = True
+
+                # Only create ToolSpec if decorated or contains dangerous calls
+                if not has_tool_decorator and not has_code_exec:
+                    continue
+
+                func_name = node.name
+                is_destructive = any(kw in func_name.lower() for kw in _DESTRUCTIVE_KW)
+
+                tools.append(
+                    ToolSpec(
+                        name=func_name,
+                        description=ast.get_docstring(node),
+                        is_destructive=is_destructive,
+                        accepts_code_execution=has_code_exec,
+                        source_file=fpath,
+                        source_line=node.lineno,
+                    )
+                )
+        return tools
 
     def _check_tool(self, tool: ToolSpec) -> list[Finding]:
         findings: list[Finding] = []
