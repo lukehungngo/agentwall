@@ -1,6 +1,6 @@
 # AgentWall Benchmark 3000
 
-**Date:** 2026-03-21
+**Date:** 2026-03-22
 **Version:** AgentWall v0.1.0
 **Layers enabled:** L0–L6 (default static analysis) + V5 engine
 **Projects:** 486

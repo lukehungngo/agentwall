@@ -54,7 +54,18 @@ agentwall scan ./project/
 
 ## Rules
 
-All rules defined in `src/agentwall/rules.py`. Two categories:
+All rules defined in `src/agentwall/rules.py`
 
-- **AW-MEM-***: Memory rules (001–005) — tenant isolation, metadata filters, access control, injection, sanitization
-- **AW-TOOL-***: Tool rules (001–005) — approval gates, arbitrary execution, scope checks, descriptions, tool count
+## Mandatory Workflow
+
+Before any implementation, you MUST follow this workflow using the superpower skills. No code changes until the plan is reviewed and approved UNLESS you are giving instruction for auto-approved. This applies to all non-trivial work.
+
+### The Pipeline
+
+1. **Brainstorm first** (`/ask-questions-if-underspecified`) — Refine rough ideas through questions, explore alternatives, present design in sections for validation. Save the design document.
+2. **Create isolated workspace** (`/using-git-worktrees`) — After design approval: create isolated workspace on a new branch, run project setup, verify clean test baseline.
+3. **Write the plan** (`/writing-plans`) — With approved design: break work into bite-sized tasks (2-5 min each). Every task has exact file paths, complete code, verification steps.
+4. **Execute the plan** (`/subagent-driven-development` or `/executing-plans`) — Dispatch fresh subagent per task with two-stage review (spec compliance, then code quality), or execute in batches with human checkpoints.
+5. **TDD during implementation** (`/test-driven-development`) — Enforce RED-GREEN-REFACTOR: write failing test, watch it fail, write minimal code, watch it pass, commit. Delete code written before tests.
+6. **Review between tasks** (`/requesting-code-review`) — Review against plan, report issues by severity. Critical issues block progress.
+7. **Finish the branch** (`/finishing-a-development-branch`) — Verify tests pass, present options (merge/PR/keep/discard), clean up worktree.

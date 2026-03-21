@@ -122,10 +122,21 @@ def _read_setup_py_name(target: Path) -> str | None:
 def _has_framework_module_layout(target: Path) -> bool:
     """Secondary signal: top-level directory matches a known framework module name.
 
-    Catches monorepos or renamed packages where pyproject.toml name doesn't
-    match but the actual source layout is a known framework (e.g.,
-    ``libs/community/langchain_community/``).
+    Only fires when NO metadata file exists (pyproject.toml/setup.cfg/setup.py).
+    Requires BOTH a matching package dir AND a library marker file (setup.py,
+    setup.cfg, or MANIFEST.in) to avoid false positives on user apps that
+    have a framework module installed/vendored locally.
+
+    Catches monorepos or renamed packages where metadata doesn't match.
     """
+    # Require at least one library-marker file — otherwise this is likely
+    # a user app with a coincidentally named directory.
+    has_library_marker = any(
+        (target / f).exists() for f in ("setup.py", "setup.cfg", "MANIFEST.in")
+    )
+    if not has_library_marker:
+        return False
+
     for child in target.iterdir():
         if (
             child.is_dir()
