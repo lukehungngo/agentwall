@@ -11,10 +11,10 @@
 | Dimension          | Reality                                                      | Production Standard            | Gap      |
 | ------------------ | ------------------------------------------------------------ | ------------------------------ | -------- |
 | Framework adapters | **6 (LangChain, LlamaIndex, CrewAI, OpenAI Agents, AutoGen, vectorstore_direct)** | 5+ with deep analysis | **Done** |
-| FP rate            | **~5.1% estimated** (path-based, 6384 findings, 325 est FP) | <15%                           | **Met**  |
+| FP rate            | **~5.7% estimated** (path-based, 2741 findings, 157 est FP) | <15%                           | **Met**  |
 | Engine integration | IsolationEvidence drives MEM findings                        | Engine drives all findings     | **Done** |
-| Detection coverage | **291/345 projects get findings (84%)**                      | >85%                           | Low      |
-| Zero-finding rate  | **16% overall (~5% for vector-store projects)**              | <10% for vector-store projects | **Near** |
+| Detection coverage | **290/362 projects get findings (80%)**                      | >85%                           | Medium   |
+| Zero-finding rate  | **20% overall** (72 zero-finding after P0 fix)               | <10% for vector-store projects | Medium   |
 | CI/CD              | **action.yml created, SARIF upload**                         | GitHub Action + SARIF upload   | **Done** |
 | Documentation      | **README updated, docs/rules.md, CLI explain/rules**         | Full docs                      | **Done** |
 | Test coverage      | **85% (808 tests)**                                          | >85%                           | **Done** |
@@ -284,7 +284,7 @@ STEP 5: O5 — Package + Launch
 - [x] Engine StoreProfile is the primary decision source for MEM rules
 - [x] RAG + AGT + MEM + TOOL rules fire on any Python project (framework-agnostic) — Done: 291/345 projects get findings
 - [x] 6 frameworks with adapters (LangChain, LlamaIndex, CrewAI, OpenAI Agents, AutoGen, vectorstore_direct)
-- [x] 330 of 363 benchmark projects get findings (91%) — target was 300+
+- [ ] 290 of 362 benchmark projects get findings (80%) — target 300+, dropped after P0 fix removed 2,239 false TOOL-002 findings
 - [x] SER-003 FP rate <25% (4 AST heuristics implemented)
 - [x] GitHub Action created (`action.yml`) — needs testing on 3 real repos before marketplace publish
 - [x] README quickstart updated with correct badges and framework table
