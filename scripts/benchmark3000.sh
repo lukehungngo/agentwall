@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AgentWall Benchmark 3000 — comprehensive scan of 326 AI agent projects
+# AgentWall Benchmark 3000 — comprehensive scan of 367 AI agent projects
 # Usage: ./scripts/benchmark3000.sh [targets_dir] [results_dir]
 # macOS: brew install bash coreutils && /opt/homebrew/bin/bash scripts/benchmark3000.sh
 #
@@ -867,6 +867,108 @@ reg prompt-maker "https://github.com/adamjen/Prompt_Maker.git" \
 #     "CrewAI Lab" "~9" "crewai-small"
 reg billy-crewai-research "https://github.com/billy-enrizky/crewai-research-assistant.git" \
     "CrewAI Research Assistant" "~8" "crewai-small"
+
+# ── Batch 2: Additional AI agent/RAG repos (added 2026-03-21) ──────────
+
+# --- LangChain / LangGraph ---
+reg langchain-streamlit-agent "https://github.com/langchain-ai/streamlit-agent.git" \
+    "LangChain Streamlit Agent" "~1.6k" "langchain"
+reg pixegami-langchain-rag "https://github.com/pixegami/langchain-rag-tutorial.git" \
+    "LangChain RAG Tutorial" "~926" "langchain"
+reg alphasecio-langchain-examples "https://github.com/alphasecio/langchain-examples.git" \
+    "LangChain Examples Collection" "~544" "langchain"
+reg nicoladisabato-multiagenticrag "https://github.com/nicoladisabato/MultiAgenticRAG.git" \
+    "Multi-Agentic RAG LangGraph" "~207" "langchain"
+reg thomas-rag-langchain "https://github.com/ThomasJay/RAG.git" \
+    "RAG with LangChain ChromaDB" "~209" "langchain"
+
+# --- RAG Frameworks & Pipelines ---
+reg llmware "https://github.com/llmware-ai/llmware.git" \
+    "Enterprise RAG pipeline framework" "~14.9k" "rag"
+reg ragatouille "https://github.com/AnswerDotAI/RAGatouille.git" \
+    "ColBERT late-interaction for RAG" "~3.9k" "rag"
+reg rag-fusion "https://github.com/Raudaschl/rag-fusion.git" \
+    "Multi-query + Reciprocal Rank Fusion" "~908" "rag"
+reg rag-demystified "https://github.com/pchunduri6/rag-demystified.git" \
+    "Advanced RAG pipeline from scratch" "~860" "rag"
+reg super-rag "https://github.com/superagent-ai/super-rag.git" \
+    "Super performant RAG pipelines" "~389" "rag"
+reg mini-rag "https://github.com/bakrianoo/mini-rag.git" \
+    "Educational production RAG" "~548" "rag"
+reg raglite "https://github.com/superlinear-ai/raglite.git" \
+    "Python RAG toolkit with DuckDB" "~1.1k" "rag"
+reg gpt-rag "https://github.com/Azure/GPT-RAG.git" \
+    "Azure OpenAI RAG at scale" "~1.1k" "rag"
+reg azure-search-openai-demo "https://github.com/Azure-Samples/azure-search-openai-demo.git" \
+    "Azure RAG sample app" "~7.6k" "rag"
+reg lettuce-detect "https://github.com/KRLabsOrg/LettuceDetect.git" \
+    "RAG hallucination detection" "~534" "rag"
+reg rule-based-retrieval "https://github.com/whyhow-ai/rule-based-retrieval.git" \
+    "Rule-based retrieval with Pinecone" "~249" "rag"
+reg onerag "https://github.com/notadev-iamaura/OneRAG.git" \
+    "Production RAG with 6 vector DB swaps" "~115" "rag"
+reg clawrag "https://github.com/2dogsandanerd/ClawRag.git" \
+    "RAG with Docling + ChromaDB" "~125" "rag"
+
+# --- GraphRAG ---
+reg fast-graphrag "https://github.com/circlemind-ai/fast-graphrag.git" \
+    "Graph-based RAG retrieval" "~3.7k" "graphrag"
+reg graphrag-local-ui "https://github.com/severian42/GraphRAG-Local-UI.git" \
+    "GraphRAG with local LLMs" "~2.3k" "graphrag"
+reg graphrag-local-ollama "https://github.com/TheAiSingularity/graphrag-local-ollama.git" \
+    "GraphRAG + Ollama local models" "~1.1k" "graphrag"
+reg neo4j-graphrag-python "https://github.com/neo4j/neo4j-graphrag-python.git" \
+    "Neo4j GraphRAG Python" "~1.1k" "graphrag"
+reg aperag "https://github.com/apecloud/ApeRAG.git" \
+    "Production GraphRAG + AI agents" "~1.1k" "graphrag"
+reg graph-rag-agent "https://github.com/1517005260/graph-rag-agent.git" \
+    "GraphRAG + LightRAG + Neo4j" "~2k" "graphrag"
+
+# --- AutoGen ---
+reg autogen-graphrag-ollama "https://github.com/karthik-codex/Autogen_GraphRAG_Ollama.git" \
+    "AutoGen + GraphRAG + Ollama" "~835" "autogen"
+
+# --- OpenAI Agents SDK ---
+reg openai-cs-agents-demo "https://github.com/openai/openai-cs-agents-demo.git" \
+    "Customer service Agents SDK demo" "~5.9k" "openai-agents"
+reg agents-deep-research "https://github.com/qx-labs/agents-deep-research.git" \
+    "Deep research with Agents SDK" "~745" "openai-agents"
+
+# --- Pydantic AI ---
+reg pydantic-ai-tutorial "https://github.com/abdallah-ali-abdallah/pydantic-ai-agents-tutorial.git" \
+    "Pydantic AI agents tutorial" "~146" "pydantic-ai"
+reg haiku-rag "https://github.com/ggozad/haiku.rag.git" \
+    "Agentic RAG with Pydantic AI" "~498" "pydantic-ai"
+
+# --- ChromaDB / Vector Stores ---
+reg agentmemory "https://github.com/elizaOS/agentmemory.git" \
+    "Agent memory with ChromaDB" "~233" "vectorstore"
+reg chatpdf-shibing "https://github.com/shibing624/ChatPDF.git" \
+    "Chat with PDF using embeddings" "~841" "vectorstore"
+
+# --- Autonomous Agents ---
+reg agixt "https://github.com/Josh-XT/AGiXT.git" \
+    "Dynamic AI agent automation platform" "~3.2k" "agent"
+reg superagi "https://github.com/TransformerOptimus/SuperAGI.git" \
+    "Open source autonomous AI agent framework" "~17.3k" "agent"
+reg agenticseek "https://github.com/Fosowl/agenticSeek.git" \
+    "Fully local autonomous agent" "~25.6k" "agent"
+reg gpt-newspaper "https://github.com/rotemweiss57/gpt-newspaper.git" \
+    "GPT autonomous agent creating newspapers" "~1.5k" "agent"
+reg openai-agent-swarm "https://github.com/daveshap/OpenAI_Agent_Swarm.git" \
+    "Hierarchical Autonomous Agent Swarm" "~3.1k" "agent"
+reg restgpt "https://github.com/Yifan-Song793/RestGPT.git" \
+    "LLM agent controlling RESTful APIs" "~1.4k" "agent"
+reg gptme "https://github.com/gptme/gptme.git" \
+    "Terminal agent with local tools" "~4.2k" "agent"
+
+# --- Agentic RAG / Specialized ---
+reg vectara-agentic "https://github.com/vectara/py-vectara-agentic.git" \
+    "Vectara agentic RAG Python" "~114" "rag"
+reg rag-chatbot-umbertogriffo "https://github.com/umbertogriffo/rag-chatbot.git" \
+    "RAG chatbot from documents" "~393" "rag"
+reg local-rag "https://github.com/jonfairbanks/local-rag.git" \
+    "Local RAG with open-source LLMs" "~735" "rag"
 
 # ── Force framework overrides ───────────────────────────────────────────
 
