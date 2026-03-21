@@ -88,12 +88,12 @@
 | 6 | LlamaDeploy | ~2k | 60 | 2 | 0 | 1 | 1 | 0 | AW-CFG-hardcoded-secret(1), AW-SER-003(1) |
 | 7 | LlamaIndex.TS | ~3k | 0 | 1 | 0 | 1 | 0 | 0 | AW-CFG-hardcoded-secret(1) |
 | 8 | LlamaAgents | ~1k | 60 | 2 | 0 | 1 | 1 | 0 | AW-CFG-hardcoded-secret(1), AW-SER-003(1) |
-| 9 | LlamaHub | ~3k | 593 | 108 | 14 | 74 | 19 | 1 | AW-MEM-003(50), AW-MEM-001(30), AW-MEM-005(17) |
+| 9 | LlamaHub | ~3k | 593 | 108 | 0 | 58 | 19 | 31 | AW-MEM-003(50), AW-MEM-001(30), AW-MEM-005(17) |
 | 10 | LlamaLab | ~1k | 26 | 0 | 0 | 0 | 0 | 0 | — |
 | 11 | Multi-Agent Concierge | ~500 | 3 | 2 | 0 | 2 | 0 | 0 | AW-MEM-004(1), AW-MEM-003(1) |
 | 12 | PR Manager (LlamaIndex) | ~11 | 14 | 0 | 0 | 0 | 0 | 0 | — |
 
-**Totals: 147 findings (14 CRITICAL, 103 HIGH) across 1020 files. 9/12 have findings.**
+**Totals: 147 findings (0 CRITICAL, 87 HIGH) across 1020 files. 9/12 have findings.**
 
 ---
 
@@ -656,8 +656,8 @@
 | Projects with findings | 380 (79%) |
 | Total files scanned | 48,618 |
 | Total findings | 3679 |
-| CRITICAL | 139 |
-| HIGH | 1900 |
+| CRITICAL | 125 |
+| HIGH | 1884 |
 | Findings per file | 0.076 |
 
 ### Category Comparison
@@ -666,7 +666,7 @@
 |---|---|---|---|---|---|---|---|
 | LangChain Ecosystem (>2k stars) | 26 | 26 | 21 | 517 | 50 | 214 | 8,881 |
 | LangChain Extended | 24 | 24 | 20 | 135 | 8 | 61 | 957 |
-| LlamaIndex Core | 12 | 11 | 9 | 147 | 14 | 103 | 1,020 |
+| LlamaIndex Core | 12 | 11 | 9 | 147 | 0 | 87 | 1,020 |
 | LlamaIndex Extended | 112 | 112 | 95 | 634 | 23 | 414 | 4,762 |
 | CrewAI Ecosystem | 108 | 105 | 68 | 278 | 3 | 138 | 3,925 |
 | Multi-Agent Frameworks | 39 | 39 | 33 | 702 | 8 | 217 | 7,906 |
