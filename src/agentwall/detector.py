@@ -13,6 +13,10 @@ _FRAMEWORK_SIGNATURES: dict[str, list[str]] = {
     "crewai": ["crewai"],
     "autogen": ["autogen", "pyautogen"],
     "vectorstore_direct": ["chromadb", "pinecone", "qdrant_client", "pymilvus", "weaviate"],
+    "pydantic_ai": ["pydantic_ai"],
+    "graphrag": ["graphrag"],
+    "dspy": ["dspy"],
+    "semantic_kernel": ["semantic_kernel"],
 }
 
 # Directories that are never part of the primary source — skip entirely.
