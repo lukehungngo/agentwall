@@ -101,26 +101,21 @@ class ToolAnalyzer:
                     continue
 
                 # Check for @tool decorator
-                has_tool_decorator = False
-                for dec in node.decorator_list:
-                    if isinstance(dec, ast.Name) and dec.id == "tool":
-                        has_tool_decorator = True
-                    elif isinstance(dec, ast.Call) and isinstance(dec.func, ast.Name) and dec.func.id == "tool":
-                        has_tool_decorator = True
-                    elif isinstance(dec, ast.Attribute) and dec.attr == "tool":
-                        has_tool_decorator = True
+                has_tool_decorator = any(
+                    (isinstance(dec, ast.Name) and dec.id == "tool")
+                    or (isinstance(dec, ast.Call) and isinstance(dec.func, ast.Name) and dec.func.id == "tool")
+                    or (isinstance(dec, ast.Attribute) and dec.attr == "tool")
+                    for dec in node.decorator_list
+                )
 
                 # Check body for exec/eval/compile and subprocess calls
-                has_code_exec = False
-                for child in ast.walk(node):
-                    if isinstance(child, ast.Call):
-                        if isinstance(child.func, ast.Name) and child.func.id in _EXEC_CALLS:
-                            has_code_exec = True
-                        elif (
-                            isinstance(child.func, ast.Attribute)
-                            and child.func.attr in _SUBPROCESS_ATTRS
-                        ):
-                            has_code_exec = True
+                has_code_exec = any(
+                    isinstance(child, ast.Call) and (
+                        (isinstance(child.func, ast.Name) and child.func.id in _EXEC_CALLS)
+                        or (isinstance(child.func, ast.Attribute) and child.func.attr in _SUBPROCESS_ATTRS)
+                    )
+                    for child in ast.walk(node)
+                )
 
                 # Only create ToolSpec if decorated or contains dangerous calls
                 if not has_tool_decorator and not has_code_exec:

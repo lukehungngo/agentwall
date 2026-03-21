@@ -18,7 +18,7 @@ def delete_records(ids: list) -> str:
 def run_agent(query):
     result = read_database(query)
     output = invoke(result)
-    add_texts(output)
+    add_texts(output)  # noqa: F821
     return output
 
 

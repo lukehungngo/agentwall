@@ -203,7 +203,7 @@ class MemoryAnalyzer:
                     MemoryConfig(
                         backend=backend,
                         source_file=path,
-                        source_line=node.lineno,
+                        source_line=getattr(node, "lineno", 1),
                     )
                 )
         return configs
