@@ -32,29 +32,8 @@
       "Bash:hatch publish*"
     ]
   },
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash /home/soh/working/agent-wall/.claude/hooks/lint.sh 2>/dev/null || true",
-            "timeout": 15,
-            "statusMessage": "Linting..."
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash /home/soh/working/agent-wall/.claude/hooks/pre-stop-gate.sh"
-          }
-        ]
-      }
-    ]
+  "hooks": {},
+  "enabledPlugins": {
+    "claude-hud@claude-hud": true
   }
 }

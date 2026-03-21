@@ -1,12 +1,30 @@
 #!/usr/bin/env bash
 # AgentWall Benchmark 3000 — comprehensive scan of 300+ AI agent projects
 # Usage: ./scripts/benchmark3000.sh [targets_dir] [results_dir]
+# macOS: brew install bash coreutils && /opt/homebrew/bin/bash scripts/benchmark3000.sh
 #
 # Massively expanded version of benchmark.sh. Clones projects (shallow),
 # runs agentwall scan on each, maps findings to attack vectors, and
 # generates BENCHMARK3000.md.
 
 set -euo pipefail
+
+# Requires bash 4+ for associative arrays (declare -A)
+if ((BASH_VERSINFO[0] < 4)); then
+  echo "ERROR: bash 4+ required (you have $BASH_VERSION)." >&2
+  echo "macOS fix: brew install bash && /opt/homebrew/bin/bash $0 $*" >&2
+  exit 1
+fi
+
+# macOS compatibility: use gtimeout (GNU coreutils) if timeout is missing
+if ! command -v timeout &>/dev/null; then
+  if command -v gtimeout &>/dev/null; then
+    timeout() { gtimeout "$@"; }
+  else
+    echo "ERROR: 'timeout' not found. Install GNU coreutils: brew install coreutils" >&2
+    exit 1
+  fi
+fi
 
 TARGETS_DIR="${1:-/tmp/agentwall-bench3k}"
 RESULTS_DIR="${2:-/tmp/agentwall-results3k}"
@@ -1029,53 +1047,29 @@ wait
 echo "  Cloned: new=$((TOTAL_REPOS - clone_skip)), cached=$clone_skip"
 echo ""
 
-# ── Scan ─────────────────────────────────────────────────────────────────
+# ── Scan (parallel) ──────────────────────────────────────────────────────
 
-echo "=== Phase 2: Scanning $TOTAL_REPOS projects ==="
-scan_done=0
-scan_fail=0
-scan_skip=0
+echo "=== Phase 2: Scanning $TOTAL_REPOS projects (max $MAX_PARALLEL parallel) ==="
 
-for name in "${REPO_NAMES[@]}"; do
-  dir="$TARGETS_DIR/$name"
-  out="$RESULTS_DIR/$name.json"
+scan_one() {
+  local name="$1" dir="$2" out="$3" fw_flag="$4" log_file="$5" scan_timeout="$6"
 
-  if [ ! -d "$dir" ]; then
-    echo "  $name: skipped (not cloned)"
-    ((scan_skip++)) || true
-    continue
-  fi
-
-  # Skip if already scanned (idempotent reruns)
-  if [ -f "$out" ] && [ -s "$out" ]; then
-    echo "  $name: cached"
-    ((scan_done++)) || true
-    continue
-  fi
-
-  echo -n "  [$((scan_done + scan_fail + scan_skip + 1))/$TOTAL_REPOS] $name: scanning..."
-
-  fw_flag=""
-  if [[ -v "FORCE_FRAMEWORK[$name]" ]]; then
-    fw_flag="--framework ${FORCE_FRAMEWORK[$name]}"
-  fi
-
+  local scan_start scan_end scan_dur scan_exit
   scan_start="$(date +%s)"
   # shellcheck disable=SC2086
-  if timeout "$SCAN_TIMEOUT" agentwall scan "$dir" $fw_flag --fail-on none --confidence medium --output "$out" >/dev/null 2>&1; then
+  if timeout "$scan_timeout" agentwall scan "$dir" $fw_flag --fail-on none --confidence medium --output "$out" >/dev/null 2>&1; then
     scan_exit=0
-    echo " done"
+    echo "  $name: done"
   else
     scan_exit=$?
     if [ "$scan_exit" -eq 124 ]; then
-      echo " TIMEOUT (${SCAN_TIMEOUT}s)"
+      echo "  $name: TIMEOUT (${scan_timeout}s)"
     else
-      echo " done (exit $scan_exit)"
+      echo "  $name: done (exit $scan_exit)"
     fi
   fi
   scan_end="$(date +%s)"
   scan_dur=$((scan_end - scan_start))
-  ((scan_done++)) || true
 
   # Write per-project log entry
   {
@@ -1108,11 +1102,49 @@ if sev:
     else
       echo "No output file produced"
     fi
-  } >> "$RUN_LOG"
+  } >> "$log_file"
+}
+
+export -f scan_one
+
+scan_skip=0
+job_count=0
+
+for name in "${REPO_NAMES[@]}"; do
+  dir="$TARGETS_DIR/$name"
+  out="$RESULTS_DIR/$name.json"
+
+  if [ ! -d "$dir" ]; then
+    echo "  $name: skipped (not cloned)"
+    ((scan_skip++)) || true
+    continue
+  fi
+
+  # Skip if already scanned (idempotent reruns)
+  if [ -f "$out" ] && [ -s "$out" ]; then
+    echo "  $name: cached"
+    continue
+  fi
+
+  fw_flag=""
+  if [[ -v "FORCE_FRAMEWORK[$name]" ]]; then
+    fw_flag="--framework ${FORCE_FRAMEWORK[$name]}"
+  fi
+
+  scan_one "$name" "$dir" "$out" "$fw_flag" "$RUN_LOG" "$SCAN_TIMEOUT" &
+  ((job_count++)) || true
+
+  if (( job_count >= MAX_PARALLEL )); then
+    wait -n 2>/dev/null || wait
+    ((job_count--)) || true
+  fi
 done
 
+# Wait for remaining scan jobs
+wait
+
 echo ""
-echo "  Scanned: $scan_done / Skipped: $scan_skip"
+echo "  Skipped: $scan_skip"
 echo ""
 
 # ── Generate BENCHMARK3000.md ───────────────────────────────────────────

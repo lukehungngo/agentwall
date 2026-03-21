@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
 # AgentWall Benchmark — scan top 20 real-world LangChain projects
 # Usage: ./scripts/benchmark.sh [targets_dir] [results_dir]
+# macOS: brew install bash coreutils && /opt/homebrew/bin/bash scripts/benchmark.sh
 #
 # Clones projects (if not already present), runs agentwall scan on each,
 # maps findings to attack vectors, and generates BENCHMARK.md.
 
 set -euo pipefail
+
+# Requires bash 4+ for associative arrays (declare -A)
+if ((BASH_VERSINFO[0] < 4)); then
+  echo "ERROR: bash 4+ required (you have $BASH_VERSION)." >&2
+  echo "macOS fix: brew install bash && /opt/homebrew/bin/bash $0 $*" >&2
+  exit 1
+fi
 
 TARGETS_DIR="${1:-/tmp/agentwall-targets}"
 RESULTS_DIR="${2:-/tmp/agentwall-results}"
@@ -15,6 +23,7 @@ BENCHMARK_MD="$PROJECT_ROOT/BENCHMARK.md"
 LOG_DIR="$PROJECT_ROOT/logs"
 RUN_TIMESTAMP="$(date '+%Y%m%d_%H%M%S')"
 RUN_LOG="$LOG_DIR/benchmark_${RUN_TIMESTAMP}.log"
+MAX_PARALLEL="${MAX_PARALLEL:-4}"       # parallel scan jobs
 
 mkdir -p "$TARGETS_DIR" "$RESULTS_DIR" "$LOG_DIR"
 
@@ -68,52 +77,52 @@ REPO_NAMES=(
 
 declare -A REPOS=(
   # Tier 1
-  [langchain-chatchat]="https://github.com/chatchat-space/Langchain-Chatchat.git"
-  [private-gpt]="https://github.com/zylon-ai/private-gpt.git"
-  [quivr]="https://github.com/QuivrHQ/quivr.git"
-  [localgpt]="https://github.com/PromtEngineer/localGPT.git"
-  [docsgpt]="https://github.com/arc53/DocsGPT.git"
-  [gpt-researcher]="https://github.com/assafelovic/gpt-researcher.git"
-  [onyx]="https://github.com/onyx-dot-app/onyx.git"
-  [db-gpt]="https://github.com/eosphoros-ai/DB-GPT.git"
-  [chat-langchain]="https://github.com/langchain-ai/chat-langchain.git"
-  [rasagpt]="https://github.com/paulpierre/RasaGPT.git"
-  [langflow]="https://github.com/langflow-ai/langflow.git"
-  [flowise]="https://github.com/FlowiseAI/Flowise.git"
-  [open-interpreter]="https://github.com/OpenInterpreter/open-interpreter.git"
-  [chainlit]="https://github.com/Chainlit/chainlit.git"
-  [embedchain]="https://github.com/mem0ai/mem0.git"
-  [llm-app]="https://github.com/pathwaycom/llm-app.git"
-  [haystack]="https://github.com/deepset-ai/haystack.git"
-  [superagent]="https://github.com/superagent-ai/superagent.git"
-  [agentgpt]="https://github.com/reworkd/AgentGPT.git"
-  [auto-gpt-web]="https://github.com/Significant-Gravitas/AutoGPT.git"
+  ["langchain-chatchat"]="https://github.com/chatchat-space/Langchain-Chatchat.git"
+  ["private-gpt"]="https://github.com/zylon-ai/private-gpt.git"
+  ["quivr"]="https://github.com/QuivrHQ/quivr.git"
+  ["localgpt"]="https://github.com/PromtEngineer/localGPT.git"
+  ["docsgpt"]="https://github.com/arc53/DocsGPT.git"
+  ["gpt-researcher"]="https://github.com/assafelovic/gpt-researcher.git"
+  ["onyx"]="https://github.com/onyx-dot-app/onyx.git"
+  ["db-gpt"]="https://github.com/eosphoros-ai/DB-GPT.git"
+  ["chat-langchain"]="https://github.com/langchain-ai/chat-langchain.git"
+  ["rasagpt"]="https://github.com/paulpierre/RasaGPT.git"
+  ["langflow"]="https://github.com/langflow-ai/langflow.git"
+  ["flowise"]="https://github.com/FlowiseAI/Flowise.git"
+  ["open-interpreter"]="https://github.com/OpenInterpreter/open-interpreter.git"
+  ["chainlit"]="https://github.com/Chainlit/chainlit.git"
+  ["embedchain"]="https://github.com/mem0ai/mem0.git"
+  ["llm-app"]="https://github.com/pathwaycom/llm-app.git"
+  ["haystack"]="https://github.com/deepset-ai/haystack.git"
+  ["superagent"]="https://github.com/superagent-ai/superagent.git"
+  ["agentgpt"]="https://github.com/reworkd/AgentGPT.git"
+  ["auto-gpt-web"]="https://github.com/Significant-Gravitas/AutoGPT.git"
   # Tier 2
-  [memory-agent]="https://github.com/langchain-ai/memory-agent.git"
-  [rag-research-agent]="https://github.com/langchain-ai/rag-research-agent-template.git"
-  [langchain-chatbot]="https://github.com/shashankdeshpande/langchain-chatbot.git"
-  [chat-with-websites]="https://github.com/alejandro-ao/chat-with-websites.git"
-  [cohere-qdrant-retrieval]="https://github.com/menloparklab/langchain-cohere-qdrant-doc-retrieval.git"
-  [rag-chatbot-langchain]="https://github.com/AlaGrine/RAG_chatabot_with_Langchain.git"
-  [langchain-rag-chroma]="https://github.com/romilandc/langchain-RAG.git"
-  [chat-with-pdf]="https://github.com/ashutoshvct/chat-with-pdf.git"
-  [langchain-multi-agent]="https://github.com/Hegazy360/langchain-multi-agent.git"
-  [objectbox-rag]="https://github.com/NebeyouMusie/End-to-End-RAG-Project-using-ObjectBox-and-LangChain.git"
+  ["memory-agent"]="https://github.com/langchain-ai/memory-agent.git"
+  ["rag-research-agent"]="https://github.com/langchain-ai/rag-research-agent-template.git"
+  ["langchain-chatbot"]="https://github.com/shashankdeshpande/langchain-chatbot.git"
+  ["chat-with-websites"]="https://github.com/alejandro-ao/chat-with-websites.git"
+  ["cohere-qdrant-retrieval"]="https://github.com/menloparklab/langchain-cohere-qdrant-doc-retrieval.git"
+  ["rag-chatbot-langchain"]="https://github.com/AlaGrine/RAG_chatabot_with_Langchain.git"
+  ["langchain-rag-chroma"]="https://github.com/romilandc/langchain-RAG.git"
+  ["chat-with-pdf"]="https://github.com/ashutoshvct/chat-with-pdf.git"
+  ["langchain-multi-agent"]="https://github.com/Hegazy360/langchain-multi-agent.git"
+  ["objectbox-rag"]="https://github.com/NebeyouMusie/End-to-End-RAG-Project-using-ObjectBox-and-LangChain.git"
 )
 
 # Projects that need --framework langchain (auto-detect fails)
 declare -A FORCE_FRAMEWORK=(
-  [localgpt]="langchain"
-  [private-gpt]="langchain"
-  [embedchain]="langchain"
-  [llm-app]="langchain"
-  [superagent]="langchain"
+  ["localgpt"]="langchain"
+  ["private-gpt"]="langchain"
+  ["embedchain"]="langchain"
+  ["llm-app"]="langchain"
+  ["superagent"]="langchain"
   # Tier 2
-  [chat-with-pdf]="langchain"
-  [objectbox-rag]="langchain"
-  [cohere-qdrant-retrieval]="langchain"
-  [langchain-rag-chroma]="langchain"
-  [rag-chatbot-langchain]="langchain"
+  ["chat-with-pdf"]="langchain"
+  ["objectbox-rag"]="langchain"
+  ["cohere-qdrant-retrieval"]="langchain"
+  ["langchain-rag-chroma"]="langchain"
+  ["rag-chatbot-langchain"]="langchain"
 )
 
 # ── Clone ─────────────────────────────────────────────────────────────────
@@ -129,34 +138,23 @@ for name in "${REPO_NAMES[@]}"; do
   fi
 done
 
-# ── Scan ──────────────────────────────────────────────────────────────────
+# ── Scan (parallel) ───────────────────────────────────────────────────────
 
 echo ""
-echo "=== Running AgentWall scans ==="
-for name in "${REPO_NAMES[@]}"; do
-  dir="$TARGETS_DIR/$name"
-  out="$RESULTS_DIR/$name.json"
+echo "=== Running AgentWall scans (max $MAX_PARALLEL parallel) ==="
 
-  if [ ! -d "$dir" ]; then
-    echo "  $name: skipped (not cloned)"
-    continue
-  fi
+scan_one() {
+  local name="$1" dir="$2" out="$3" fw_flag="$4" log_file="$5"
 
-  echo -n "  $name: scanning..."
-
-  fw_flag=""
-  if [[ -v "FORCE_FRAMEWORK[$name]" ]]; then
-    fw_flag="--framework ${FORCE_FRAMEWORK[$name]}"
-  fi
-
-  # shellcheck disable=SC2086
+  local scan_start scan_end scan_dur scan_exit
   scan_start="$(date +%s)"
+  # shellcheck disable=SC2086
   if agentwall scan "$dir" $fw_flag --fail-on none --confidence medium --output "$out" >/dev/null 2>&1; then
     scan_exit=0
-    echo " done"
+    echo "  $name: done"
   else
     scan_exit=$?
-    echo " done (exit $scan_exit)"
+    echo "  $name: done (exit $scan_exit)"
   fi
   scan_end="$(date +%s)"
   scan_dur=$((scan_end - scan_start))
@@ -216,8 +214,37 @@ for f in findings:
     else
       echo "No output file produced"
     fi
-  } >> "$RUN_LOG"
+  } >> "$log_file"
+}
+
+export -f scan_one
+
+job_count=0
+for name in "${REPO_NAMES[@]}"; do
+  dir="$TARGETS_DIR/$name"
+  out="$RESULTS_DIR/$name.json"
+
+  if [ ! -d "$dir" ]; then
+    echo "  $name: skipped (not cloned)"
+    continue
+  fi
+
+  fw_flag=""
+  if [[ -v "FORCE_FRAMEWORK[$name]" ]]; then
+    fw_flag="--framework ${FORCE_FRAMEWORK[$name]}"
+  fi
+
+  scan_one "$name" "$dir" "$out" "$fw_flag" "$RUN_LOG" &
+  ((job_count++)) || true
+
+  if (( job_count >= MAX_PARALLEL )); then
+    wait -n 2>/dev/null || wait
+    ((job_count--)) || true
+  fi
 done
+
+# Wait for remaining scan jobs
+wait
 
 # ── Generate BENCHMARK.md ────────────────────────────────────────────────
 

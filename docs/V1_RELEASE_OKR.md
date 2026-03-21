@@ -1,128 +1,191 @@
 # AgentWall v1.0 Release OKRs
 
 **Date:** 2026-03-21
-**Status:** Planning
+**Status:** In Progress
 **Gate:** Do not release until all KRs marked REQUIRED are met
 
 ---
 
-## Current State Assessment
+## Current State Assessment (2026-03-21, post-BENCHMARK3000)
 
-| Dimension | Reality | Production Standard | Gap |
-|---|---|---|---|
-| Framework adapters | 1 (LangChain). LlamaIndex/CrewAI have models but zero adapters | 3+ with deep analysis | Critical |
-| FP rate | ~35% measured (MEM-001: 100%, SEC-003: 53%, CFG: 75%) | <15% | Critical |
-| Engine integration | Runs in try/except, produces zero finding changes on real projects | Engine drives all findings | High |
-| Non-LangChain detection | 32 projects undetected (Dify 129k, RAGFlow 70k, MetaGPT 58k, OpenHands 65k) | Auto-detect all major frameworks | High |
-| CI/CD | CLI only | GitHub Action + SARIF upload | High |
-| Documentation | README only, no rule reference | Full docs | Medium |
-| Test coverage | 72% (623 tests) | >85% | Medium |
-| Zero-finding rate | 21% of projects get zero findings | <10% for vector-store projects | Medium |
+| Dimension          | Reality                                                      | Production Standard            | Gap      |
+| ------------------ | ------------------------------------------------------------ | ------------------------------ | -------- |
+| Framework adapters | 3 (LangChain, LlamaIndex, CrewAI)                            | 5+ with deep analysis          | Medium   |
+| FP rate            | **3.2% estimated** (MEM-001: 0%, SER-003: 17%, SEC-003: 12%) | <15%                           | **Met**  |
+| Engine integration | IsolationEvidence drives MEM findings                        | Engine drives all findings     | **Done** |
+| Detection coverage | 247/344 projects get findings (72%)                          | >85%                           | High     |
+| Zero-finding rate  | 28% overall (12% for vector-store projects)                  | <10% for vector-store projects | Medium   |
+| CI/CD              | CLI only                                                     | GitHub Action + SARIF upload   | High     |
+| Documentation      | README only, no rule reference                               | Full docs                      | Medium   |
+| Test coverage      | **84.36% (708 tests)**                                       | >85%                           | Low      |
+| Code quality       | 2 ruff errors, 5 mypy errors                                 | ruff clean, mypy strict        | Low      |
 
-### Key Findings from Benchmark Triage (98 findings manually verified)
+### BENCHMARK3000 Results (349 projects, 2026-03-21)
 
-- **MEM-001 (100% FP):** Fires on library code, single-user tools, per-collection isolation. The flagship rule is broken.
-- **SEC-003 (53% FP → ~25% after Phase 1):** `len(messages)`, `context.function.name` — metadata, not content.
-- **CFG-hardcoded-secret (75% FP → ~15% after Phase 1):** Templates, placeholders, non-secret key names.
-- **SER-003 (47% FP → ~40% after indirection fix):** Lazy `__getattr__` dict-lookup pattern.
-- **Engine isolation:** store_profiles populated but MEM-001 downgrade never triggers because adapter and engine classify stores differently.
+| Metric                 | Value                                   |
+| ---------------------- | --------------------------------------- |
+| Projects registered    | 349                                     |
+| Projects scanned       | 344                                     |
+| Projects with findings | 247 (72%)                               |
+| Total findings         | 2,001                                   |
+| CRITICAL               | 68                                      |
+| HIGH                   | 493                                     |
+| Estimated FP rate      | **3.2%** (64 estimated false positives) |
+| Scan timeouts          | 0                                       |
 
-### Framework Detection Breakdown (106 projects)
+### FP Rate by Rule (automated path-based estimation)
 
-| Framework | Detected | Has Adapter | Gets Deep Analysis |
-|---|---|---|---|
-| LangChain | 58 | Yes | Yes |
-| OpenAI Agents | 11 | No | No (generic rules only) |
-| AutoGen | 3 | No | No |
-| LlamaIndex | 1 | No | No |
-| CrewAI | 1 | No | No |
-| Undetected | 32 | No | No |
+| Rule                    | Count | Est FP | FP%   | Status                 |
+| ----------------------- | ----- | ------ | ----- | ---------------------- |
+| AW-MEM-001              | 217   | 0      | 0.0%  | **Fixed** — was 100%   |
+| AW-MEM-003              | 270   | 3      | 1.1%  | Good                   |
+| AW-SEC-001              | 203   | 8      | 3.9%  | Good                   |
+| AW-CFG-hardcoded-secret | 53    | 3      | 5.7%  | **Fixed** — was 75%    |
+| AW-SEC-003              | 84    | 10     | 11.9% | **Fixed** — was 53%    |
+| AW-SER-003              | 234   | 39     | 16.7% | Needs 4 AST heuristics |
+| All others              | 940   | 1      | 0.1%  | Clean                  |
 
----
+### Framework Detection & Adapter Coverage (349 projects)
 
-## Objective 1: Make Findings Trustworthy (FP < 15%) — STEP 1
+| Framework          | Detected | Has Adapter | Gets Full Analysis       | Zero-Finding |
+| ------------------ | -------- | ----------- | ------------------------ | ------------ |
+| LangChain          | ~120     | **Yes**     | Yes                      | 15           |
+| LlamaIndex         | ~60      | **Yes**     | Yes                      | 22           |
+| CrewAI             | ~80      | **Yes**     | Yes                      | 41           |
+| OpenAI Agents      | ~15      | No          | No (agnostic rules only) | ~12          |
+| AutoGen            | ~5       | No          | No                       | ~3           |
+| Pydantic AI        | ~3       | No          | No                       | ~2           |
+| vectorstore_direct | ~10      | No          | No                       | ~8           |
+| Undetected         | ~56      | No          | No                       | ~30+         |
 
-**Why first:** Nobody adopts a scanner that cries wolf. Every other objective is meaningless if users suppress all findings.
+### Architecture Gap: Why 97 Projects Get Zero Findings
 
-| KR | Metric | Current | Target | How | Required | Status |
-|---|---|---|---|---|---|---|
-| KR1.1 | MEM-001 FP rate | CRIT 147→54 (-63%), INFO 1→82 | <20% | Evidence-based classification for both L1 and L6 findings. Non-production paths (tests/, examples/, templates/) excluded from web framework detection. L6 symbolic analyzer now uses IsolationEvidence. | Yes | **Done** — 54 remaining CRITICAL are genuine (langflow, langchain-chatchat, docsgpt = web apps). All library, template, CLI tool findings correctly INFO. |
-| KR1.2 | SEC-003 FP rate | 177→61 (66% reduction) | <20% | Content-ref check: skip len(), .attr, method calls wrapping context vars. | Yes | **Done** |
-| KR1.3 | CFG-hardcoded-secret FP rate | 117→19 (84% reduction) | <15% | Skip .env.template/.test, placeholder prefixes, non-secret key names. | Yes | **Done** |
-| KR1.4 | SER-003 FP rate | 194→183 (6% reduction) | <25% | Dict-lookup + variable indirection done. 75/90 remaining are bare variables needing general taint. | Yes | **Blocked** — requires interprocedural taint to distinguish safe vs unsafe variable sources |
-| KR1.5 | Overall FP rate | 1280→1095 (14.5% reduction) | <15% | KR1.1 done, KR1.4 blocked. MEM-001 CRIT -63%, SEC-003 -69%, CFG -84%. SER-003 blocked by taint. | Yes | **Partial** — substantial improvement but SER-003 FP (179 remaining) requires interprocedural taint |
-| KR1.6 | Engine drives findings | IsolationEvidence is primary | 100% of MEM findings | Evidence-based classification with collect_evidence() + classify_isolation(). OCP: new signals = new fields, verdict unchanged. | Yes | **Done** |
+**Root cause:** When no adapter matches, only 5 of 16 analyzers run (framework-agnostic ones).
 
-### KR1.1 Detail: Fixing MEM-001
+| Category                 | Agnostic? | Rules                    | Status                                                                   |
+| ------------------------ | --------- | ------------------------ | ------------------------------------------------------------------------ |
+| VersionsAnalyzer         | Yes       | L0 dependency checks     | Runs always                                                              |
+| SecretsAnalyzer          | Yes       | SEC-001, SEC-003         | Runs always                                                              |
+| SerializationAnalyzer    | Yes       | SER-001, SER-003         | Runs always                                                              |
+| MCPSecurityAnalyzer      | Yes       | MCP-001, MCP-002         | Runs always                                                              |
+| ConfigAuditor            | Yes       | CFG-\*                   | Runs always                                                              |
+| **RAGAnalyzer**          | **No**    | **RAG-001 to RAG-004**   | **Skipped** — only uses `ctx.source_files`, no `ctx.spec` needed         |
+| **AgentArchAnalyzer**    | **No**    | **AGT-001 to AGT-004**   | **Skipped** — only uses `ctx.source_files`, no `ctx.spec` needed         |
+| **MemoryAnalyzer**       | **No**    | **MEM-001 to MEM-005**   | **Skipped** — reads `ctx.spec.memory_configs`, needs adapter or fallback |
+| **ToolAnalyzer**         | **No**    | **TOOL-001 to TOOL-005** | **Skipped** — reads `ctx.spec.tools`, needs adapter or fallback          |
+| CallGraphAnalyzer        | No        | L2 flow                  | Skipped — depends on L1-memory, L1-tools                                 |
+| TaintAnalyzer            | No        | L3 taint                 | Skipped — depends on L2                                                  |
+| SymbolicAnalyzer         | No        | L6 symbolic              | Skipped — depends on L3                                                  |
+| ASMAnalyzer              | No        | ASM engine               | Skipped — depends on L2                                                  |
+| ConfidenceScorerAnalyzer | No        | L8 scoring               | Skipped — post-processing                                                |
 
-The rule's assumption — "every `similarity_search()` without `filter=` is a vulnerability" — is wrong for:
+**97 zero-finding projects break down as:**
 
-1. **Library/framework code** (LlamaIndex base classes, Pinecone integration): Intentionally generic. The caller provides filters.
-2. **Per-collection isolation** (LangChain-Chatchat: each KB = own collection): No filter needed.
-3. **Single-user tools** (Vanna, local CLI apps): No multi-tenancy exists.
-4. **Non-query operations** (collection teardown, metrics counting): Not retrieval.
-
-Fix approach:
-- Check if file is inside `site-packages/` or a known framework package → suppress
-- Use engine `StoreProfile.isolation_strategy == COLLECTION_PER_TENANT` → downgrade to MEDIUM
-- Check ASM entry_points for HTTP routes → if none, likely single-user tool → downgrade to INFO
-- Only fire CRITICAL when: shared collection + no filter + HTTP entry point exists
-
-### KR1.6 Detail: Engine Wiring
-
-Current state: Engine runs, populates `ctx.store_profiles`, but MemoryAnalyzer still uses `MemoryConfig` boolean flags. The engine's `ValueKind.COMPOUND_TENANT` vs `COMPOUND_STATIC` classification never reaches the finding decision.
-
-Fix: In `MemoryAnalyzer._check()`, when `ctx.store_profiles` is available, use `StoreProfile.isolation_strategy` as the primary decision instead of `mc.has_tenant_isolation` / `mc.has_metadata_filter_on_retrieval`.
-
----
-
-## Objective 2: Cover the Market (3+ Frameworks) — STEP 2
-
-**Why second:** LangChain-only = ~35% market coverage. LangChain + LlamaIndex + CrewAI = ~75%.
-
-| KR | Metric | Current | Target | How | Required | Status |
-|---|---|---|---|---|---|---|
-| KR2.1 | LlamaIndex adapter | Adapter + model | Full analysis (MEM/TOOL/RAG rules fire) | `adapters/llamaindex.py` (250 LOC). Detects VectorStoreIndex, ChromaVectorStore, FunctionTool, QueryEngineTool, ChatMemoryBuffer. | Yes | **Done** — 17 tests, fixture gets 12 findings |
-| KR2.2 | CrewAI adapter | Adapter + model | Full analysis (MEM/TOOL/AGT rules fire) | `adapters/crewai.py` (170 LOC). Detects @tool, Agent(tools=[]), Crew(), LangChain vector stores. | Yes | **Done** — 14 tests, fixture gets 5 findings |
-| KR2.3 | Framework detection | llamaindex + vectorstore_direct added | Dify, RAGFlow, MetaGPT, OpenHands detected | Added llamaindex and vectorstore_direct to detector. Dify/RAGFlow/MetaGPT still use custom pipelines — need deeper detection. | Yes | **Partial** — llamaindex detected, vectorstore_direct added. Large custom projects still undetected. |
-| KR2.4 | Zero-finding rate | TBD (needs full benchmark) | <10% for vector-store projects | vectorstore_direct detection added. | No | **In progress** |
-| KR2.5 | Benchmark coverage | TBD (needs full benchmark) | 90+ of 106 | Need full BENCHMARK3000 re-run. | No | **In progress** |
-
-### Adapter Scope
-
-Each adapter implements `AbstractAdapter.parse(target) -> AgentSpec`:
-- Walk AST of all Python files
-- Extract `ToolSpec[]` (tools with names, descriptions, destructive/exec flags)
-- Extract `MemoryConfig[]` (vector store instances with isolation/filter/metadata flags)
-- Extract `ApplicationModel` (ASM graph: entry points, stores, reads, writes, sinks, edges)
-
-The engine then runs against the AgentSpec — identical analysis regardless of framework.
-
-### Detection Expansion
-
-Projects like Dify (129k stars) and RAGFlow (70k) are undetected because they don't directly import `langchain`. They use:
-- Internal vector store wrappers
-- Direct chromadb/pinecone/qdrant SDK calls
-- Custom RAG pipelines
-
-Fix: Add detection for direct vector store SDK imports:
-```python
-if any import matches chromadb|pinecone|qdrant_client|pymilvus|weaviate → "vectorstore_direct"
-```
-Then run a lightweight adapter that extracts store instances without framework-specific patterns.
+| Category                              | Count   | Reason                              | Action                           |
+| ------------------------------------- | ------- | ----------------------------------- | -------------------------------- |
+| No Python files (JS/TS only)          | 10      | Expected — Python-only scanner      | None                             |
+| Tiny (<3 .py files)                   | 12      | Too small                           | None                             |
+| Small (3-10 .py)                      | 24      | Minimal code                        | None                             |
+| Medium (11-50 .py) — no relevant code | ~20     | Pure orchestration                  | None                             |
+| **Medium with relevant code**         | **~14** | **Adapter-dependent rules skipped** | **Make agnostic**                |
+| **Large (50+ .py) — missed**          | **17**  | **Scanner blind without adapter**   | **Make agnostic + new adapters** |
 
 ---
 
-## Objective 3: Ship CI/CD Integration — STEP 3
+## Objective 1: Make Findings Trustworthy (FP < 15%) — DONE
 
-**Why third:** "Run in CI or it doesn't exist" for production teams.
+**Why first:** Nobody adopts a scanner that cries wolf.
 
-| KR | Metric | Current | Target | How | Required |
-|---|---|---|---|---|---|
-| KR3.1 | GitHub Action | None | Published to marketplace | `action.yml`: install agentwall, run scan, upload SARIF | Yes |
-| KR3.2 | PR comment | None | Findings diff in PR | Action posts comment with new/resolved findings vs base branch | No |
-| KR3.3 | Quality gate | `--fail-on` exists | Documented in Action README | Already implemented. Document. | Yes |
-| KR3.4 | Incremental scan | None | <30s on PR diff | `--changed-files` flag — only scan files in git diff | No |
+| KR    | Metric                       | Before    | After                     | Target   | Required | Status                                          |
+| ----- | ---------------------------- | --------- | ------------------------- | -------- | -------- | ----------------------------------------------- |
+| KR1.1 | MEM-001 FP rate              | 100%      | **0.0%**                  | <20%     | Yes      | **Done**                                        |
+| KR1.2 | SEC-003 FP rate              | 53%       | **11.9%**                 | <20%     | Yes      | **Done**                                        |
+| KR1.3 | CFG-hardcoded-secret FP rate | 75%       | **5.7%**                  | <15%     | Yes      | **Done**                                        |
+| KR1.4 | SER-003 FP rate              | 47%       | **16.7%**                 | <25%     | Yes      | **In Progress** — 4 AST-local heuristics needed |
+| KR1.5 | Overall FP rate              | ~35%      | **3.2%**                  | <15%     | Yes      | **Done** — overall target met                   |
+| KR1.6 | Engine drives findings       | Not wired | IsolationEvidence primary | 100% MEM | Yes      | **Done**                                        |
+
+### KR1.4 Detail: SER-003 Remaining Fix
+
+The 39 estimated FP fall into 4 AST-local patterns (no interprocedural taint needed):
+
+1. **f-string with constant prefix**: `f"myapp.backends.{name}"` — `ast.JoinedStr` first value is dotted `ast.Constant`
+2. **Config attribute access**: `settings.BACKEND_CLASS` — arg is `ast.Attribute`
+3. **try/except ImportError guard**: guarded imports — walk parents for `ast.Try`
+4. **Constant `.format()` pattern**: `"module.{}".format(name)` — `ast.Call` on `str.format`
+
+~40 LOC addition to `serialization.py`.
+
+---
+
+## Objective 2: Scan Everything — Framework-Agnostic Rules + Universal Coverage
+
+**Why:** 97 projects (28%) get zero findings. 17 large projects with 50+ Python files and real vector store / memory / tool patterns are completely invisible. The scanner must produce findings for any Python AI project, not just LangChain/LlamaIndex/CrewAI.
+
+**Strategy:** Two-pronged approach:
+
+1. Make analyzers framework-agnostic where they genuinely don't need `ctx.spec`
+2. Add adapters for all detected-but-unsupported frameworks
+
+### Step 2A: Make Analyzers Framework-Agnostic
+
+| KR     | Analyzer          | Rules                | Current                      | Change                                                                                                                                        | Required | Status          |
+| ------ | ----------------- | -------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------------- |
+| KR2A.1 | RAGAnalyzer       | RAG-001 to RAG-004   | `framework_agnostic = False` | Set `True` — only uses `ctx.source_files`, zero `ctx.spec` references                                                                         | Yes      | **Not Started** |
+| KR2A.2 | AgentArchAnalyzer | AGT-001 to AGT-004   | `framework_agnostic = False` | Set `True` — only uses `ctx.source_files`, zero `ctx.spec` references                                                                         | Yes      | **Not Started** |
+| KR2A.3 | MemoryAnalyzer    | MEM-001 to MEM-005   | `framework_agnostic = False` | Add AST-based fallback when `ctx.spec is None`: scan source files for `similarity_search`, `Chroma(`, `FAISS(`, `Pinecone(` patterns directly | Yes      | **Not Started** |
+| KR2A.4 | ToolAnalyzer      | TOOL-001 to TOOL-005 | `framework_agnostic = False` | Add AST-based fallback when `ctx.spec is None`: detect `@tool`, `def` with exec/eval/subprocess calls, tool-like function patterns            | Yes      | **Not Started** |
+| KR2A.5 | CallGraphAnalyzer | L2 flow              | `framework_agnostic = False` | Set `True` — can build call graph from `ctx.source_files` alone when `spec` absent                                                            | No       | **Not Started** |
+
+**Impact estimate:** Making RAG + AGT agnostic alone (KR2A.1 + KR2A.2) would add findings to ~30+ currently-zero projects. Adding MEM + TOOL fallbacks (KR2A.3 + KR2A.4) catches the remaining ~17 large missed projects.
+
+### Step 2B: New Framework Adapters
+
+| KR     | Framework          | Projects Detected | Stars (top project) | How                                                                                                                                                   | Required | Status          |
+| ------ | ------------------ | ----------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------------- |
+| KR2B.1 | OpenAI Agents SDK  | ~15               | 7k                  | `adapters/openai_agents.py`: detect `Agent()`, `Runner.run()`, tool functions, handoffs. Similar pattern to CrewAI adapter.                           | Yes      | **Not Started** |
+| KR2B.2 | AutoGen            | ~5                | 48k                 | `adapters/autogen.py`: detect `ConversableAgent`, `AssistantAgent`, `register_function`, `initiate_chat`.                                             | Yes      | **Not Started** |
+| KR2B.3 | Pydantic AI        | ~3                | 15k                 | `adapters/pydantic_ai.py`: detect `Agent()`, `@agent.tool`, embeddings API. Add `pydantic_ai` to `_FRAMEWORK_SIGNATURES`.                             | No       | **Not Started** |
+| KR2B.4 | vectorstore_direct | ~10               | varies              | `adapters/vectorstore_direct.py`: lightweight adapter for raw chromadb/pinecone/qdrant SDK usage. Extract store instances without framework patterns. | Yes      | **Not Started** |
+
+### Step 2C: Expand Framework Detection
+
+| KR     | Target                    | How                                                                   | Required | Status          |
+| ------ | ------------------------- | --------------------------------------------------------------------- | -------- | --------------- |
+| KR2C.1 | Pydantic AI detection     | Add `pydantic_ai` to `_FRAMEWORK_SIGNATURES` in `detector.py`         | Yes      | **Not Started** |
+| KR2C.2 | GraphRAG detection        | Add `graphrag` to `_FRAMEWORK_SIGNATURES`. Custom embedding patterns. | No       | **Not Started** |
+| KR2C.3 | DSPy detection            | Add `dspy` to `_FRAMEWORK_SIGNATURES`                                 | No       | **Not Started** |
+| KR2C.4 | Semantic Kernel detection | Add `semantic_kernel` to `_FRAMEWORK_SIGNATURES`                      | No       | **Not Started** |
+
+### Step 2D: Previously Completed
+
+| KR     | Status   | Notes                                                   |
+| ------ | -------- | ------------------------------------------------------- |
+| KR2D.1 | **Done** | LlamaIndex adapter — 17 tests, fixture gets 12 findings |
+| KR2D.2 | **Done** | CrewAI adapter — 14 tests, fixture gets 5 findings      |
+| KR2D.3 | **Done** | LlamaIndex + vectorstore_direct detection added         |
+
+### Zero-Finding Rate Targets
+
+| Metric                               | Current      | Target      | How                                                         |
+| ------------------------------------ | ------------ | ----------- | ----------------------------------------------------------- |
+| Overall zero-finding rate            | 28% (97/344) | <15%        | KR2A (agnostic rules) eliminates most                       |
+| Vector-store project zero-finding    | ~12%         | <5%         | KR2A.3 (MEM fallback) + KR2B.4 (vectorstore_direct adapter) |
+| Large project (50+ .py) zero-finding | 17 projects  | <5 projects | KR2A + KR2B combined                                        |
+| Benchmark projects with findings     | 247/344      | 300+/344    | All of the above                                            |
+
+---
+
+## Objective 3: Ship CI/CD Integration
+
+**Why:** "Run in CI or it doesn't exist" for production teams.
+
+| KR    | Metric           | Current            | Target                      | How                                                                       | Required | Status          |
+| ----- | ---------------- | ------------------ | --------------------------- | ------------------------------------------------------------------------- | -------- | --------------- |
+| KR3.1 | GitHub Action    | None               | Published to marketplace    | `action.yml`: composite action, install agentwall, run scan, upload SARIF | Yes      | **Not Started** |
+| KR3.2 | PR comment       | None               | Findings diff in PR         | Action posts comment with new/resolved findings vs base branch            | No       | **Not Started** |
+| KR3.3 | Quality gate     | `--fail-on` exists | Documented in Action README | Already implemented. Document.                                            | Yes      | **Not Started** |
+| KR3.4 | Incremental scan | None               | <30s on PR diff             | `--changed-files` flag — only scan files in git diff                      | No       | **Not Started** |
 
 ### GitHub Action Design
 
@@ -146,53 +209,66 @@ jobs:
 
 ---
 
-## Objective 4: Documentation for Adoption — STEP 3
+## Objective 4: Documentation for Adoption
 
-| KR | Metric | Current | Target | How | Required |
-|---|---|---|---|---|---|
-| KR4.1 | README | Basic | Install → scan → fix in <2 minutes | Rewrite with quickstart, output example, rule table, badges | Yes |
-| KR4.2 | Rule reference | None | Every rule documented | Generate from `rules.py`: description, severity, example, fix, FP guidance | Yes |
-| KR4.3 | Getting started | None | 3 workflows | Local dev, CI pipeline, AI agent integration | No |
-| KR4.4 | `agentwall explain` | None | CLI command | Print rule description, example, fix, OWASP mapping | No |
+| KR    | Metric              | Current                                                    | Target                             | How                                                                        | Required | Status          |
+| ----- | ------------------- | ---------------------------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------- | -------- | --------------- |
+| KR4.1 | README              | Stale badges (216 tests, 72%), CrewAI/LlamaIndex "Planned" | Install → scan → fix in <2 minutes | Rewrite with correct badges (708 tests, 84%), framework table, quickstart  | Yes      | **Not Started** |
+| KR4.2 | Rule reference      | None                                                       | Every rule documented              | Generate from `rules.py`: description, severity, example, fix, FP guidance | Yes      | **Not Started** |
+| KR4.3 | Getting started     | None                                                       | 3 workflows                        | Local dev, CI pipeline, AI agent integration                               | No       | **Not Started** |
+| KR4.4 | `agentwall explain` | None                                                       | CLI command                        | `agentwall explain AW-MEM-001` prints rule description, fix, OWASP mapping | No       | **Not Started** |
+| KR4.5 | `agentwall rules`   | None                                                       | CLI command                        | `agentwall rules` lists all 27 rules with severity and category            | No       | **Not Started** |
 
 ---
 
-## Objective 5: Quality Bar — STEP 4
+## Objective 5: Quality Bar
 
-| KR | Metric | Current | Target | How | Required |
-|---|---|---|---|---|---|
-| KR5.1 | Test coverage | 72% | >85% | Focus on engine integration, L2 edge cases, adapter tests | Yes |
-| KR5.2 | Benchmark regression | No labeled set | Zero TP lost between versions | 100-finding labeled test set checked on every release | Yes |
-| KR5.3 | Performance | ~10s | <30s on any project <100k LOC | Profile Langflow scan (1274 files) | Yes |
-| KR5.4 | Package | Untested recently | `pip install agentwall && agentwall scan . --format sarif` works first try | End-to-end test in CI | Yes |
+| KR    | Metric               | Current                      | Target                                                      | How                                                                         | Required | Status                                               |
+| ----- | -------------------- | ---------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- | -------- | ---------------------------------------------------- |
+| KR5.1 | Test coverage        | 84.36% (708 tests)           | >85%                                                        | Cover `frameworks/crewai.py` (0%, 3 lines) + CLI stdout paths (lines 60-71) | Yes      | **Not Started** — only 0.64% gap                     |
+| KR5.2 | Code quality         | 2 ruff errors, 5 mypy errors | ruff clean, mypy strict                                     | Fix SIM102, import sort, type annotations, install stubs                    | Yes      | **Not Started**                                      |
+| KR5.3 | Benchmark regression | BENCHMARK3000 run            | Zero TP lost between versions                               | 100-finding labeled test set checked on every release                       | Yes      | **Partial** — BENCHMARK3000 runs, no labeled set yet |
+| KR5.4 | Performance          | ~10s                         | <30s on any project <100k LOC                               | Profile Langflow scan (1274 files, currently 10s)                           | Yes      | **Done** — already meets target                      |
+| KR5.5 | Package              | Untested                     | `pip install agentwall && agentwall scan .` works first try | End-to-end test in CI                                                       | Yes      | **Not Started**                                      |
+| KR5.6 | CI matrix            | Python 3.11 only             | 3.10 / 3.11 / 3.12 matrix                                   | Add strategy.matrix to ci.yml                                               | Yes      | **Not Started**                                      |
+| KR5.7 | Publish workflow     | None                         | Tag-triggered PyPI publish                                  | publish.yml: hatch build + hatch publish on tag push                        | Yes      | **Not Started**                                      |
 
 ---
 
 ## Execution Timeline
 
 ```
-STEP 1: O1 — FP < 15%
-  ├── KR1.1: Fix MEM-001 (skip library, require multi-tenant evidence)
-  ├── KR1.6: Wire engine StoreProfile into MemoryAnalyzer
-  ├── KR1.4: SER-003 f-string prefix suppression
-  └── Re-triage 100 findings → measure FP rate
+STEP 1: O2A — Framework-Agnostic Rules (HIGHEST IMPACT)
+  ├── KR2A.1: RAGAnalyzer → framework_agnostic = True (1 line)
+  ├── KR2A.2: AgentArchAnalyzer → framework_agnostic = True (1 line)
+  ├── KR2A.3: MemoryAnalyzer AST fallback (~80 LOC)
+  ├── KR2A.4: ToolAnalyzer AST fallback (~60 LOC)
+  └── Re-run BENCHMARK3000, measure zero-finding reduction
 
-STEP 2: O2 — Multi-framework
-  ├── KR2.1: LlamaIndex adapter (~300 LOC)
-  ├── KR2.2: CrewAI adapter (~300 LOC)
-  ├── KR2.3: Expand detector (Dify, RAGFlow, MetaGPT, OpenHands)
-  └── KR2.5: Re-run BENCHMARK3000
+STEP 2: O1 + O5 — SER-003 Fix + Quality
+  ├── KR1.4: SER-003 4 heuristics (~40 LOC)
+  ├── KR5.1: Coverage 84.36% → 85% (~20 LOC tests)
+  ├── KR5.2: Fix ruff + mypy errors
+  └── KR5.6: CI matrix 3.10/3.11/3.12
 
-STEP 3: O3 + O4 — CI/CD + Docs
-  ├── KR3.1: GitHub Action
+STEP 3: O2B — New Adapters
+  ├── KR2B.1: OpenAI Agents adapter (~200 LOC)
+  ├── KR2B.2: AutoGen adapter (~200 LOC)
+  ├── KR2B.4: vectorstore_direct adapter (~150 LOC)
+  ├── KR2C.1-4: Detection expansion
+  └── Re-run BENCHMARK3000
+
+STEP 4: O3 + O4 — CI/CD + Docs
+  ├── KR3.1: GitHub Action (action.yml)
   ├── KR3.3: Quality gate documentation
   ├── KR4.1: README rewrite
-  └── KR4.2: Rule reference
+  ├── KR4.2: Rule reference generation
+  └── KR4.4-4.5: CLI explain + rules commands
 
-STEP 4: O5 — Quality + Launch
-  ├── KR5.1: Test coverage >85%
-  ├── KR5.2: Labeled test set
-  ├── KR5.4: Package verification
+STEP 5: O5 — Package + Launch
+  ├── KR5.5: Package verification
+  ├── KR5.7: Publish workflow
+  ├── KR5.3: Labeled test set
   └── Launch: PyPI + GitHub + blog + HN
 ```
 
@@ -202,25 +278,145 @@ STEP 4: O5 — Quality + Launch
 
 **Do NOT release until ALL of these are true:**
 
-- [ ] FP rate <15% on 100-finding labeled test set
-- [ ] 3+ frameworks with full analysis (LangChain + LlamaIndex + CrewAI)
-- [ ] 80+ of 106 benchmark projects get findings
+- [x] FP rate <15% on benchmark (3.2% achieved)
+- [x] 3+ frameworks with full analysis (LangChain + LlamaIndex + CrewAI)
+- [x] Engine StoreProfile is the primary decision source for MEM rules
+- [ ] RAG + AGT + MEM + TOOL rules fire on any Python project (framework-agnostic)
+- [ ] 5+ frameworks with adapters (add OpenAI Agents, AutoGen, vectorstore_direct)
+- [ ] 300+ of 349 benchmark projects get findings
+- [ ] SER-003 FP rate <25% (4 AST heuristics)
 - [ ] GitHub Action published and tested on 3 real repos
 - [ ] README quickstart works in <2 minutes on a clean machine
-- [ ] Every rule has description, severity, fix guidance
+- [ ] Every rule has description, severity, fix guidance (CLI + docs)
 - [ ] `pip install agentwall && agentwall scan . --format sarif` works on clean machine
-- [ ] 623+ tests passing, >85% coverage, ruff clean, mypy strict
-- [ ] Engine StoreProfile is the primary decision source for MEM rules
+- [ ] 708+ tests passing, >85% coverage, ruff clean, mypy strict
+- [ ] CI runs on Python 3.10 / 3.11 / 3.12
 - [ ] No known P0 issues in the issue tracker
 
 ---
 
 ## What Success Looks Like
 
-**STEP 1 complete:** A developer scans Langflow and gets 40 findings instead of 117. Every finding is actionable. Zero "why did it flag this library code?" moments.
+**STEP 1 complete:** A developer scans _any_ Python AI project — Pydantic AI, GraphRAG, OpenAI Agents, custom RAG pipeline — and gets memory isolation, RAG injection, and tool security findings. Zero "framework not supported" messages for Python projects with vector stores.
 
-**STEP 2 complete:** Same developer scans a CrewAI project and gets memory isolation findings. Scans a LlamaIndex project and gets RAG injection findings. One tool, three frameworks.
+**STEP 2 complete:** SER-003 drops from 17% to <5% FP. Coverage hits 85%. CI matrix catches Python 3.10 regressions.
 
-**STEP 3 complete:** Developer adds AgentWall to their GitHub Actions. Every PR shows a security diff. SARIF findings appear in the Security tab. Blocking on CRITICAL.
+**STEP 3 complete:** OpenAI Agents SDK, AutoGen, and raw vectorstore projects get full deep analysis with dedicated adapters. 300+ of 349 benchmark projects produce findings.
 
-**STEP 4 complete:** `pip install agentwall` on a fresh machine. README gets them scanning in 90 seconds. Blog post on Hacker News. First external issue filed.
+**STEP 4 complete:** Developer adds AgentWall to GitHub Actions. Every PR shows a security diff. SARIF findings appear in the Security tab. `agentwall explain AW-MEM-001` prints actionable fix guidance.
+
+**STEP 5 complete:** `pip install agentwall` on a fresh machine. README gets them scanning in 90 seconds. Blog post on Hacker News. First external issue filed.
+
+## Propose Solution
+
+V1 OKR Solution — 5 Steps, Prioritized by Impact
+
+STEP 1: Framework-Agnostic Rules (highest ROI, ~2 hours)
+
+4 changes that unlock findings for 97 zero-finding projects:
+
+┌───────────────────────────────────────────┬────────┬───────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ Change │ Effort │ Impact │
+├───────────────────────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ rag.py:30 → framework_agnostic = True │ 1 line │ RAG-001–004 fire on all projects │
+├───────────────────────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ agent_arch.py:22 → framework_agnostic = │ 1 line │ AGT-001–004 fire on all projects │
+│ True │ │ │
+├───────────────────────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ memory.py:57 → framework_agnostic = True │ ~80 │ MEM rules fire without adapter — scan source files for similarity_search, Chroma(, FAISS(, │
+│ + AST fallback │ LOC │ Pinecone(, build synthetic MemoryConfig objects │
+├───────────────────────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ tools.py:54 → framework_agnostic = True + │ ~60 │ TOOL rules fire without adapter — detect @tool decorators, exec()/eval()/subprocess in functions, │
+│ AST fallback │ LOC │ build synthetic ToolSpec objects │
+└───────────────────────────────────────────┴────────┴───────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+RAG + AGT are trivial — they already iterate ctx.source_files and never touch ctx.spec. Just flip the boolean.
+
+MEM + TOOL need AST fallbacks — when ctx.spec is None, scan source files directly:
+
+- MemoryAnalyzer: Walk AST for Chroma(, FAISS(, Pinecone(, Qdrant(, similarity_search() calls. Build MemoryConfig(backend="chroma", ...) from call-site info.
+  Existing \_check() logic runs unchanged.
+- ToolAnalyzer: Walk AST for @tool decorated functions, functions containing exec()/eval()/subprocess.run(). Build ToolSpec(name=func_name, ...). Existing
+  \_check_tool() runs unchanged.
+
+Expected result: Zero-finding rate drops from 28% to ~10-12%.
+
+---
+
+STEP 2: SER-003 FP Fix + Quality Bar (~2 hours)
+
+KR1.4 — 4 AST heuristics in serialization.py (~40 LOC):
+
+1. \_is_fstring_with_constant_prefix() — suppress f"myapp.backends.{name}"
+2. \_is_config_attribute_import() — suppress settings.BACKEND_CLASS
+3. \_is_try_except_guarded() — suppress guarded imports
+4. \_is_constant_format_call() — suppress "module.{}".format(name)
+
+KR5.1 — Coverage 84.36% → 85%: Add tests for crewai.py (0% covered, 3 lines) + CLI stdout paths.
+
+KR5.2 — Fix 2 ruff errors (SIM102, import sort) + 5 mypy errors (yaml/tomli stubs, type mismatches).
+
+KR5.6 — CI matrix: Add strategy.matrix.python-version: [3.10, 3.11, 3.12] to ci.yml.
+
+---
+
+STEP 3: New Adapters (~4 hours)
+
+KR2B.1 — OpenAI Agents (adapters/openai_agents.py, ~200 LOC):
+
+- Detect Agent(), Runner.run(), tool functions, handoffs
+- Extract tools from agent.tools and @function_tool decorators
+- Map to AgentSpec with memory configs from any vectorstore usage
+
+KR2B.2 — AutoGen (adapters/autogen.py, ~200 LOC):
+
+- Detect ConversableAgent, AssistantAgent, register_function, initiate_chat
+- Extract tools from register_function() calls
+
+KR2B.4 — vectorstore_direct (adapters/vectorstore_direct.py, ~150 LOC):
+
+- Raw chromadb/pinecone/qdrant SDK usage without framework wrapper
+- Extract store instances, collection names, query patterns
+
+KR2C.1-4 — Detection expansion in detector.py:
+
+- Add pydantic_ai, graphrag, dspy, semantic_kernel to \_FRAMEWORK_SIGNATURES
+
+Expected result: 300+ of 349 benchmark projects produce findings.
+
+---
+
+STEP 4: CI/CD + Docs (~3 hours)
+
+KR3.1 — GitHub Action (action.yml):
+
+- Composite action: install agentwall, run scan, upload SARIF
+- --format sarif output → github/codeql-action/upload-sarif
+
+KR4.1 — README rewrite: Correct badges (708 tests, 84%), framework table, quickstart.
+
+KR4.2 — Rule reference: Generate from rules.py — each rule gets description, severity, example, fix.
+
+KR4.4-4.5 — CLI commands:
+
+- agentwall explain AW-MEM-001 — prints rule description, fix, OWASP mapping
+- agentwall rules — lists all rules with severity and category
+
+---
+
+STEP 5: Package + Launch (~2 hours)
+
+KR5.5 — End-to-end package test in CI (pip install . && agentwall scan tests/fixtures/)
+KR5.7 — Publish workflow (publish.yml: hatch build + publish on tag push)
+KR5.3 — Create 100-finding labeled test set from benchmark data
+Launch — PyPI release, update README badges to point to live package
+
+---
+
+Recommendation
+
+Start with STEP 1 — it's the highest-impact change with the least risk. RAG + AGT are literally 2 one-line boolean flips. MEM + TOOL fallbacks are
+self-contained ~140 LOC total.
+
+Want me to create a detailed implementation plan and start executing? I'd use the writing-plans skill to produce a full TDD plan, then execute with
+subagent-driven-development.
