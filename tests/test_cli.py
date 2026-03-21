@@ -84,7 +84,7 @@ class TestCliScan:
         )
         assert result.exit_code == 0
 
-    def test_scan_unsupported_framework_terminal_shows_no_findings(self) -> None:
+    def test_scan_unsupported_framework_terminal_runs_agnostic(self) -> None:
         result = runner.invoke(
             app,
             [
@@ -97,7 +97,8 @@ class TestCliScan:
             ],
         )
         assert result.exit_code == 0
-        assert "No findings." in result.output
+        # Framework-agnostic analyzers may produce findings on fixture files
+        assert "unsupported" in result.output.lower() or "undetected" in result.output.lower()
 
     def test_scan_unsupported_framework_exits_0(self) -> None:
         result = runner.invoke(
@@ -133,7 +134,8 @@ class TestCliScan:
         assert result.exit_code == 0
         assert out.exists()
         data = json.loads(out.read_text())
-        assert data["findings"] == []
+        # Framework-agnostic analyzers may produce findings on fixture files
+        assert isinstance(data["findings"], list)
         assert data["warnings"]
 
     def test_scan_format_sarif(self, tmp_path: Path) -> None:

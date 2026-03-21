@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -13,6 +14,15 @@ from agentwall.engine.isolation_evidence import (
 )
 from agentwall.models import ConfidenceLevel, Finding, MemoryConfig
 from agentwall.rules import AW_MEM_001, AW_MEM_002, AW_MEM_003, AW_MEM_004, AW_MEM_005, RuleDef
+
+_VECTORSTORE_IMPORTS: dict[str, str] = {
+    "chromadb": "chroma",
+    "faiss": "faiss",
+    "pinecone": "pinecone",
+    "qdrant_client": "qdrant",
+    "pymilvus": "milvus",
+    "weaviate": "weaviate",
+}
 
 # Memory class backends — these are LangChain conversation memory, not vector stores.
 # They get MEM-004 (injection risk) but NOT MEM-005 (which targets vector store retrieval).
@@ -54,12 +64,12 @@ class MemoryAnalyzer:
     depends_on: Sequence[str] = ()
     replace: bool = False
     opt_in: bool = False
-    framework_agnostic: bool = False
+    framework_agnostic: bool = True
 
     def analyze(self, ctx: AnalysisContext) -> list[Finding]:
         spec = ctx.spec
         if spec is None:
-            return []
+            return self._analyze_agnostic(ctx)
         engine_isolation = self._get_engine_isolation(ctx)
         # Compute web framework presence once for the entire scan.
         has_web_framework = project_has_web_framework(ctx)
@@ -144,6 +154,59 @@ class MemoryAnalyzer:
                 findings.append(_finding_from_rule(AW_MEM_005, mc, ConfidenceLevel.MEDIUM))
 
         return findings
+
+    def _analyze_agnostic(self, ctx: AnalysisContext) -> list[Finding]:
+        """AST-based fallback when no framework adapter produced a spec."""
+        configs = self._extract_memory_configs_from_ast(ctx.source_files)
+        if not configs:
+            return []
+        engine_isolation = self._get_engine_isolation(ctx)
+        has_web_framework = project_has_web_framework(ctx)
+        findings: list[Finding] = []
+        for mc in configs:
+            findings.extend(
+                self._check(mc, ctx, engine_isolation, has_web_framework=has_web_framework)
+            )
+        return findings
+
+    @staticmethod
+    def _extract_memory_configs_from_ast(source_files: Sequence[Path]) -> list[MemoryConfig]:
+        """Walk source files for vectorstore import patterns and build synthetic configs."""
+        seen: set[tuple[str, Path]] = set()
+        configs: list[MemoryConfig] = []
+        for path in source_files:
+            try:
+                source = path.read_text(encoding="utf-8")
+                tree = ast.parse(source, filename=str(path))
+            except (SyntaxError, UnicodeDecodeError, OSError):
+                continue
+            for node in ast.walk(tree):
+                module: str | None = None
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        top = alias.name.split(".")[0]
+                        if top in _VECTORSTORE_IMPORTS:
+                            module = top
+                            break
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    top = node.module.split(".")[0]
+                    if top in _VECTORSTORE_IMPORTS:
+                        module = top
+                if module is None:
+                    continue
+                backend = _VECTORSTORE_IMPORTS[module]
+                key = (backend, path)
+                if key in seen:
+                    continue
+                seen.add(key)
+                configs.append(
+                    MemoryConfig(
+                        backend=backend,
+                        source_file=path,
+                        source_line=node.lineno,
+                    )
+                )
+        return configs
 
     @staticmethod
     def _file_has_retrieval(source_file: Path | None) -> bool:

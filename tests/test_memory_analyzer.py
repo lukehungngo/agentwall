@@ -167,3 +167,59 @@ class TestMemoryAnalyzerNoFindingsOnSafe:
         spec = AgentSpec(framework="langchain")
         findings = MemoryAnalyzer().analyze(_ctx(spec))
         assert findings == []
+
+
+class TestMemoryAnalyzerAgnostic:
+    """Tests for AST-based fallback when no framework adapter is available."""
+
+    @staticmethod
+    def _agnostic_ctx(source_files: list[Path]) -> AnalysisContext:
+        ctx = AnalysisContext(target=Path("/tmp"), config=ScanConfig.default())
+        ctx.spec = None
+        ctx.source_files = source_files
+        return ctx
+
+    def test_fires_without_spec_on_chromadb(self, tmp_path: Path) -> None:
+        f = tmp_path / "app.py"
+        f.write_text("import chromadb\n", encoding="utf-8")
+        ctx = self._agnostic_ctx([f])
+        findings = MemoryAnalyzer().analyze(ctx)
+        assert len(findings) > 0
+        rule_ids = [f_.rule_id for f_ in findings]
+        assert any(rid.startswith("AW-MEM-") for rid in rule_ids)
+
+    def test_fires_without_spec_on_faiss(self, tmp_path: Path) -> None:
+        f = tmp_path / "app.py"
+        f.write_text("import faiss\n", encoding="utf-8")
+        ctx = self._agnostic_ctx([f])
+        findings = MemoryAnalyzer().analyze(ctx)
+        assert len(findings) > 0
+        rule_ids = [f_.rule_id for f_ in findings]
+        assert any(rid.startswith("AW-MEM-") for rid in rule_ids)
+
+    def test_fires_without_spec_on_pinecone(self, tmp_path: Path) -> None:
+        f = tmp_path / "app.py"
+        f.write_text("import pinecone\n", encoding="utf-8")
+        ctx = self._agnostic_ctx([f])
+        findings = MemoryAnalyzer().analyze(ctx)
+        assert len(findings) > 0
+        rule_ids = [f_.rule_id for f_ in findings]
+        assert any(rid.startswith("AW-MEM-") for rid in rule_ids)
+
+    def test_no_findings_on_clean_code(self, tmp_path: Path) -> None:
+        f = tmp_path / "app.py"
+        f.write_text('def hello(): return "world"\n', encoding="utf-8")
+        ctx = self._agnostic_ctx([f])
+        findings = MemoryAnalyzer().analyze(ctx)
+        assert findings == []
+
+    def test_flag_is_agnostic(self) -> None:
+        assert MemoryAnalyzer.framework_agnostic is True
+
+    def test_existing_spec_behavior_unchanged(self) -> None:
+        mc = MemoryConfig(backend="chroma")
+        spec = AgentSpec(framework="langchain", memory_configs=[mc])
+        ctx = _ctx(spec)
+        findings = MemoryAnalyzer().analyze(ctx)
+        rule_ids = [f.rule_id for f in findings]
+        assert "AW-MEM-001" in rule_ids
