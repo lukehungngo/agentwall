@@ -139,6 +139,16 @@ def scan(
 
         cr_adapter = CrewAIAdapter()
         spec = cr_adapter.parse(target)
+    elif detected == "openai_agents":
+        from agentwall.adapters.openai_agents import OpenAIAgentsAdapter
+
+        oa_adapter = OpenAIAgentsAdapter()
+        spec = oa_adapter.parse(target)
+    elif detected == "autogen":
+        from agentwall.adapters.autogen import AutoGenAdapter
+
+        ag_adapter = AutoGenAdapter()
+        spec = ag_adapter.parse(target)
     else:
         scan_warnings.append(
             f"Unsupported or undetected framework: {detected!r}. "
