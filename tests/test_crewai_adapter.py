@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from agentwall.adapters.crewai import CrewAIAdapter
+from agentwall.frameworks.crewai import CREWAI_MODEL
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -105,3 +106,21 @@ class TestCrewAIAdapterEdgeCases:
         )
         spec = adapter.parse(tmp_path)
         assert spec.tools[0].accepts_code_execution is True
+
+
+class TestCrewAIFrameworkModel:
+    """Test the declarative framework model covers crewai patterns."""
+
+    def test_model_name(self) -> None:
+        assert CREWAI_MODEL.name == "crewai"
+
+    def test_chroma_store_defined(self) -> None:
+        assert "Chroma" in CREWAI_MODEL.stores
+        store = CREWAI_MODEL.stores["Chroma"]
+        assert store.backend == "chromadb"
+        assert "collection_name" in store.isolation_params
+
+    def test_decorator_patterns(self) -> None:
+        names = [p.decorator for p in CREWAI_MODEL.decorator_patterns]
+        assert "tool" in names
+        assert "task" in names
