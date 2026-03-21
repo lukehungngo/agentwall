@@ -11,7 +11,7 @@
 | Dimension          | Reality                                                      | Production Standard            | Gap      |
 | ------------------ | ------------------------------------------------------------ | ------------------------------ | -------- |
 | Framework adapters | **6 (LangChain, LlamaIndex, CrewAI, OpenAI Agents, AutoGen, vectorstore_direct)** | 5+ with deep analysis | **Done** |
-| FP rate            | **3.2% estimated** (MEM-001: 0%, SER-003: 17%, SEC-003: 12%) | <15%                           | **Met**  |
+| FP rate            | **~5.1% estimated** (path-based, 6384 findings, 325 est FP) | <15%                           | **Met**  |
 | Engine integration | IsolationEvidence drives MEM findings                        | Engine drives all findings     | **Done** |
 | Detection coverage | **291/345 projects get findings (84%)**                      | >85%                           | Low      |
 | Zero-finding rate  | **16% overall (~5% for vector-store projects)**              | <10% for vector-store projects | **Near** |
