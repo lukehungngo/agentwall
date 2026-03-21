@@ -36,6 +36,29 @@ _WEB_FRAMEWORKS: frozenset[str] = frozenset(
 # aiohttp.web is special: the import is "aiohttp" but we need "aiohttp.web"
 _WEB_FRAMEWORK_DOTTED: frozenset[str] = frozenset({"aiohttp.web"})
 
+# Directories that contain non-production code (tests, examples, templates).
+# Web framework imports in these dirs should not make the project "multi-tenant",
+# and findings in these dirs should be treated as library/non-production code.
+_NON_PRODUCTION_DIRS: frozenset[str] = frozenset(
+    {
+        "tests",
+        "test",
+        "testing",
+        "standard-tests",
+        "examples",
+        "example",
+        "demos",
+        "demo",
+        "templates",
+        "starters",
+        "cookbooks",
+        "tutorials",
+        "benchmarks",
+        "benchmark",
+        "mock_servers",
+    }
+)
+
 
 @dataclass
 class IsolationEvidence:
@@ -220,9 +243,16 @@ def project_has_web_framework(ctx: AnalysisContext) -> bool:
     """Scan project source files for web framework imports.
 
     Checks top-level import statements for known web framework names.
-    Returns True if any file imports a web framework.
+    Skips files in test/example/template directories since web framework
+    imports there (e.g., test mock servers) don't indicate the project
+    is a multi-tenant web application.
     """
     for source_file in ctx.source_files:
+        # Skip non-production files — a Flask import in tests/mock_server.py
+        # does not make the project a multi-tenant web app.
+        if _is_non_production_path(source_file, ctx.target):
+            continue
+
         try:
             source = source_file.read_text(encoding="utf-8")
             tree = ast.parse(source)
@@ -247,12 +277,28 @@ def project_has_web_framework(ctx: AnalysisContext) -> bool:
     return False
 
 
+def _is_non_production_path(source_file: Path, target: Path) -> bool:
+    """Check if a file is in a non-production directory relative to the target.
+
+    Only checks path components within the scan target, so that
+    test fixtures (which are themselves valid scan targets) are not
+    incorrectly classified as non-production.
+    """
+    try:
+        relative = source_file.resolve().relative_to(target.resolve())
+    except ValueError:
+        return False
+    rel_parts = {p.lower() for p in relative.parts}
+    return bool(rel_parts & _NON_PRODUCTION_DIRS)
+
+
 def _is_library_file(source_file: Path | None, target: Path) -> bool:
     """Check if a source file is library/framework code (not user code).
 
     A file is considered library code if:
     - Its path contains "site-packages/"
     - It is outside the scan target directory
+    - It is in a test/example/template directory relative to the target
     """
     if source_file is None:
         return False
@@ -263,8 +309,11 @@ def _is_library_file(source_file: Path | None, target: Path) -> bool:
 
     # File is outside the target directory -> dependency
     try:
-        source_file.resolve().relative_to(target.resolve())
+        relative = source_file.resolve().relative_to(target.resolve())
     except ValueError:
         return True
 
-    return False
+    # File is in a non-production directory relative to the scan target
+    # (tests/, examples/, templates/, etc.)
+    rel_parts = {p.lower() for p in relative.parts}
+    return bool(rel_parts & _NON_PRODUCTION_DIRS)

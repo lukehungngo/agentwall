@@ -44,14 +44,14 @@
 
 **Why first:** Nobody adopts a scanner that cries wolf. Every other objective is meaningless if users suppress all findings.
 
-| KR | Metric | Current | Target | How | Required |
-|---|---|---|---|---|---|
-| KR1.1 | MEM-001 FP rate | 100% | <20% | Skip library/site-packages code. Require HTTP entry point (from ASM) to confirm multi-tenant context. Downgrade single-file projects to INFO. | Yes |
-| KR1.2 | SEC-003 FP rate | ~25% | <20% | Done (Phase 1). Verify on re-triage. | Yes |
-| KR1.3 | CFG-hardcoded-secret FP rate | ~15% | <15% | Done (Phase 1). Verify on re-triage. | Yes |
-| KR1.4 | SER-003 FP rate | ~40% | <25% | Variable indirection done. Add f-string with hardcoded-only prefix suppression. | Yes |
-| KR1.5 | Overall FP rate | ~35% | <15% | Re-triage 100 findings after all fixes. Publish rate in README. | Yes |
-| KR1.6 | Engine drives findings | 0% | 100% of MEM findings | Replace MemoryConfig boolean flags with StoreProfile.isolation_strategy as primary decision source in MemoryAnalyzer. | Yes |
+| KR | Metric | Current | Target | How | Required | Status |
+|---|---|---|---|---|---|---|
+| KR1.1 | MEM-001 FP rate | CRIT 147→54 (-63%), INFO 1→82 | <20% | Evidence-based classification for both L1 and L6 findings. Non-production paths (tests/, examples/, templates/) excluded from web framework detection. L6 symbolic analyzer now uses IsolationEvidence. | Yes | **Done** — 54 remaining CRITICAL are genuine (langflow, langchain-chatchat, docsgpt = web apps). All library, template, CLI tool findings correctly INFO. |
+| KR1.2 | SEC-003 FP rate | 177→61 (66% reduction) | <20% | Content-ref check: skip len(), .attr, method calls wrapping context vars. | Yes | **Done** |
+| KR1.3 | CFG-hardcoded-secret FP rate | 117→19 (84% reduction) | <15% | Skip .env.template/.test, placeholder prefixes, non-secret key names. | Yes | **Done** |
+| KR1.4 | SER-003 FP rate | 194→183 (6% reduction) | <25% | Dict-lookup + variable indirection done. 75/90 remaining are bare variables needing general taint. | Yes | **Blocked** — requires interprocedural taint to distinguish safe vs unsafe variable sources |
+| KR1.5 | Overall FP rate | 1280→1095 (14.5% reduction) | <15% | KR1.1 done, KR1.4 blocked. MEM-001 CRIT -63%, SEC-003 -69%, CFG -84%. SER-003 blocked by taint. | Yes | **Partial** — substantial improvement but SER-003 FP (179 remaining) requires interprocedural taint |
+| KR1.6 | Engine drives findings | IsolationEvidence is primary | 100% of MEM findings | Evidence-based classification with collect_evidence() + classify_isolation(). OCP: new signals = new fields, verdict unchanged. | Yes | **Done** |
 
 ### KR1.1 Detail: Fixing MEM-001
 
@@ -80,13 +80,13 @@ Fix: In `MemoryAnalyzer._check()`, when `ctx.store_profiles` is available, use `
 
 **Why second:** LangChain-only = ~35% market coverage. LangChain + LlamaIndex + CrewAI = ~75%.
 
-| KR | Metric | Current | Target | How | Required |
-|---|---|---|---|---|---|
-| KR2.1 | LlamaIndex adapter | Model only (no adapter) | Full analysis (MEM/TOOL/RAG rules fire) | Write `adapters/llamaindex.py` using existing framework model. ~300 LOC. | Yes |
-| KR2.2 | CrewAI adapter | Model only | Full analysis (MEM/TOOL/AGT rules fire) | Write `adapters/crewai.py`. CrewAI uses `@agent`, `@task`, `@crew` decorators. | Yes |
-| KR2.3 | Framework detection | 32 projects undetected | Dify, RAGFlow, MetaGPT, OpenHands detected | Expand `detector.py` import patterns. These use LangChain/LlamaIndex internally — detect transitive deps. | Yes |
-| KR2.4 | Zero-finding rate | 21% | <10% for vector-store projects | If project imports chromadb/pinecone/qdrant but framework=none, run framework-agnostic vector store analysis. | No |
-| KR2.5 | Benchmark coverage | 84/106 with findings | 90+ of 106 | Re-run BENCHMARK3000 after framework expansion. | No |
+| KR | Metric | Current | Target | How | Required | Status |
+|---|---|---|---|---|---|---|
+| KR2.1 | LlamaIndex adapter | Adapter + model | Full analysis (MEM/TOOL/RAG rules fire) | `adapters/llamaindex.py` (250 LOC). Detects VectorStoreIndex, ChromaVectorStore, FunctionTool, QueryEngineTool, ChatMemoryBuffer. | Yes | **Done** — 17 tests, fixture gets 12 findings |
+| KR2.2 | CrewAI adapter | Adapter + model | Full analysis (MEM/TOOL/AGT rules fire) | `adapters/crewai.py` (170 LOC). Detects @tool, Agent(tools=[]), Crew(), LangChain vector stores. | Yes | **Done** — 14 tests, fixture gets 5 findings |
+| KR2.3 | Framework detection | llamaindex + vectorstore_direct added | Dify, RAGFlow, MetaGPT, OpenHands detected | Added llamaindex and vectorstore_direct to detector. Dify/RAGFlow/MetaGPT still use custom pipelines — need deeper detection. | Yes | **Partial** — llamaindex detected, vectorstore_direct added. Large custom projects still undetected. |
+| KR2.4 | Zero-finding rate | TBD (needs full benchmark) | <10% for vector-store projects | vectorstore_direct detection added. | No | **In progress** |
+| KR2.5 | Benchmark coverage | TBD (needs full benchmark) | 90+ of 106 | Need full BENCHMARK3000 re-run. | No | **In progress** |
 
 ### Adapter Scope
 

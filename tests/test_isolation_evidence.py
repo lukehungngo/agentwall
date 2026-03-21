@@ -313,6 +313,40 @@ class TestProjectHasWebFramework:
         ctx = _make_ctx(tmp_path, {"bad.py": "def broken(:\n"})
         assert project_has_web_framework(ctx) is False
 
+    def test_flask_in_tests_dir_not_detected(self, tmp_path: Path) -> None:
+        """Web framework imports in tests/ should not make project multi-tenant."""
+        tests_dir = tmp_path / "tests"
+        tests_dir.mkdir()
+        test_file = tests_dir / "mock_server.py"
+        test_file.write_text("from flask import Flask\n")
+
+        from agentwall.context import AnalysisContext
+        from agentwall.models import ScanConfig
+
+        ctx = AnalysisContext(
+            target=tmp_path,
+            config=ScanConfig.default(),
+            source_files=[test_file],
+        )
+        assert project_has_web_framework(ctx) is False
+
+    def test_flask_in_src_is_detected(self, tmp_path: Path) -> None:
+        """Web framework imports in src/ should still be detected."""
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        app_file = src_dir / "app.py"
+        app_file.write_text("from flask import Flask\n")
+
+        from agentwall.context import AnalysisContext
+        from agentwall.models import ScanConfig
+
+        ctx = AnalysisContext(
+            target=tmp_path,
+            config=ScanConfig.default(),
+            source_files=[app_file],
+        )
+        assert project_has_web_framework(ctx) is True
+
 
 # ---------------------------------------------------------------------------
 # _is_library_file
@@ -340,3 +374,38 @@ class TestIsLibraryFile:
         target = tmp_path / "my_project"
         target.mkdir()
         assert _is_library_file(other, target) is True
+
+    def test_file_in_tests_dir(self, tmp_path: Path) -> None:
+        """Files in tests/ relative to target are non-production code."""
+        p = tmp_path / "tests" / "test_store.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+        assert _is_library_file(p, tmp_path) is True
+
+    def test_file_in_examples_dir(self, tmp_path: Path) -> None:
+        """Files in examples/ relative to target are non-production code."""
+        p = tmp_path / "examples" / "demo.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+        assert _is_library_file(p, tmp_path) is True
+
+    def test_file_in_templates_dir(self, tmp_path: Path) -> None:
+        """Files in templates/ relative to target are non-production code."""
+        p = tmp_path / "templates" / "starter.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+        assert _is_library_file(p, tmp_path) is True
+
+    def test_nested_tests_dir(self, tmp_path: Path) -> None:
+        """Files in nested tests/ relative to target are non-production code."""
+        p = tmp_path / "libs" / "core" / "tests" / "test_store.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+        assert _is_library_file(p, tmp_path) is True
+
+    def test_src_not_classified_as_nonprod(self, tmp_path: Path) -> None:
+        """Files in src/ should not be classified as non-production."""
+        p = tmp_path / "src" / "app.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+        assert _is_library_file(p, tmp_path) is False

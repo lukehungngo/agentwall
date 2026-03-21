@@ -19,9 +19,14 @@ from collections.abc import Sequence
 from enum import Enum, auto
 
 from agentwall.context import AnalysisContext
+from agentwall.engine.isolation_evidence import (
+    IsolationEvidence,
+    _is_library_file,
+    classify_isolation,
+    project_has_web_framework,
+)
 from agentwall.models import (
     Category,
-    ConfidenceLevel,
     Finding,
     Severity,
 )
@@ -207,6 +212,7 @@ class SymbolicAnalyzer:
         )  # available for taint-aware path analysis (v1.0)  # noqa: F841
 
         findings: list[Finding] = []
+        has_web_fw = project_has_web_framework(ctx)
 
         for py_file in spec.source_files:
             try:
@@ -227,11 +233,23 @@ class SymbolicAnalyzer:
                     continue
 
                 if final_state == FilterState.UNFILTERED:
+                    # Use evidence-based classification instead of hardcoded CRITICAL.
+                    # Library code, test files, and non-web-framework projects
+                    # should not produce CRITICAL findings.
+                    evidence = IsolationEvidence(
+                        has_retrieval=True,
+                        has_filter=False,
+                        filter_is_tenant_scoped=False,
+                        collection_is_dynamic=False,
+                        is_library_code=_is_library_file(py_file, ctx.target),
+                        has_web_framework=has_web_fw,
+                    )
+                    severity, confidence, _reason = classify_isolation(evidence)
                     findings.append(
                         Finding(
                             rule_id="AW-MEM-001",
                             title=f"No filter on any path in {node.name}()",
-                            severity=Severity.CRITICAL,
+                            severity=severity,
                             category=Category.MEMORY,
                             description=(
                                 f"Function '{node.name}' performs vector store retrieval "
@@ -240,17 +258,29 @@ class SymbolicAnalyzer:
                             file=py_file,
                             line=node.lineno,
                             fix="Add filter= to all retrieval calls in this function.",
-                            confidence=ConfidenceLevel.HIGH,
+                            confidence=confidence,
                             layer="L6",
                         )
                     )
                 elif final_state == FilterState.TOP:
-                    # Mixed: some paths filtered, some not
+                    # Mixed: some paths filtered, some not — always HIGH or lower.
+                    evidence = IsolationEvidence(
+                        has_retrieval=True,
+                        has_filter=False,
+                        filter_is_tenant_scoped=False,
+                        collection_is_dynamic=False,
+                        is_library_code=_is_library_file(py_file, ctx.target),
+                        has_web_framework=has_web_fw,
+                    )
+                    severity, confidence, _reason = classify_isolation(evidence)
+                    # Cap at HIGH — partial filtering is never CRITICAL.
+                    if severity == Severity.CRITICAL:
+                        severity = Severity.HIGH
                     findings.append(
                         Finding(
                             rule_id="AW-MEM-001",
                             title=f"Filter missing on some paths in {node.name}()",
-                            severity=Severity.HIGH,
+                            severity=severity,
                             category=Category.MEMORY,
                             description=(
                                 f"Function '{node.name}' has vector store retrieval "
@@ -260,7 +290,7 @@ class SymbolicAnalyzer:
                             file=py_file,
                             line=node.lineno,
                             fix="Ensure filter= is applied on ALL branches.",
-                            confidence=ConfidenceLevel.MEDIUM,
+                            confidence=confidence,
                             layer="L6",
                         )
                     )
