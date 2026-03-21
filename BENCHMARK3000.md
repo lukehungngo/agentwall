@@ -3,7 +3,7 @@
 **Date:** 2026-03-21
 **Version:** AgentWall v0.1.0
 **Layers enabled:** L0–L6 (default static analysis) + V5 engine
-**Projects:** 367
+**Projects:** 486
 **Reproduce:** `./scripts/benchmark3000.sh`
 
 ---
@@ -213,7 +213,7 @@
 
 | Metric | Value |
 |---|---|
-| Total projects | 367 |
+| Total projects | 486 |
 | Projects scanned | 109 |
 | Projects with findings | 92 (84%) |
 | Total files scanned | 27,697 |
@@ -747,6 +747,125 @@ Untriaged rules use 15% conservative estimate. Actual FP rate may vary.*
 | Vectara agentic RAG Python | · | · | · | **1** | **1** | · | · | · | · | 2 |
 | RAG chatbot from documents | · | · | · | · | **5** | **3** | · | **2** | · | 10 |
 | Local RAG with open-source LLMs | · | · | · | **2** | · | · | · | **1** | · | 3 |
+| Production-ready FastAPI + LangGraph | · | · | · | · | · | · | · | · | · | 0 |
+| LangChain RAG Tutorial v2 | · | · | · | · | **3** | **3** | · | **2** | · | 8 |
+| LangGraph agents with MCP tools | · | · | · | · | · | · | · | · | · | 0 |
+| AI Chatbot with LangChain | · | · | · | · | **1** | **1** | · | · | · | 2 |
+| Smart Speaker with LangChain agents | · | · | · | · | · | · | · | · | · | 0 |
+| AWS Bedrock LangChain agent | · | · | · | · | · | · | · | · | **1** | 1 |
+| AI Coding Agent with LangGraph | **14** | · | · | · | · | · | · | · | · | 14 |
+| LangChain agents for Bitcoin | **3** | · | · | · | · | · | · | · | · | 3 |
+| Multi-agent LangGraph template | · | · | · | · | · | · | · | · | · | 0 |
+| Chat with docs using LangChain+Ollama | · | · | · | · | **3** | **1** | · | **1** | **1** | 6 |
+| Agentic incident management LangGraph | · | · | **4** | **1** | · | · | · | · | · | 5 |
+| GPT4 LangChain research agent | · | · | · | · | **2** | **1** | · | **2** | **4** | 9 |
+| Math chatbot LangChain agents | · | · | · | · | · | · | · | · | · | 0 |
+| AI Agent framework LangChain+LangGraph | **5** | · | · | · | **2** | **3** | · | · | · | 10 |
+| UiPath LangGraph agents | **1** | · | · | **1** | **1** | **2** | **1** | · | · | 6 |
+| LangChain Weaviate integration | · | · | · | · | · | · | · | · | · | 0 |
+| LangChain stock screening agent | · | · | · | · | · | · | · | **1** | · | 1 |
+| LangChain agent for Git commands | **3** | · | · | · | · | · | · | · | · | 3 |
+| LangChain agent + Neo4j memory | · | · | **1** | · | · | · | · | · | · | 1 |
+| CrewAI experiments with local models | · | · | · | **1** | · | · | · | · | · | 1 |
+| CrewAI hierarchical tutorial | · | · | · | · | · | · | · | · | · | 0 |
+| Automate YouTube with CrewAI | · | · | · | · | · | · | · | · | · | 0 |
+| CrewAI RAG deep dive | · | · | · | · | · | · | · | · | · | 0 |
+| Agency Swarm tutorial | · | · | · | · | · | · | · | · | · | 0 |
+| OpenAI function calling + Deep Lake | — | — | — | — | — | — | — | — | — | — |
+| MCP server multi-framework | · | · | · | · | · | · | · | · | · | 0 |
+| OpenAI function calling helpers | · | · | · | · | · | · | · | · | · | 0 |
+| OpenAI Functions JSON metadata | · | · | · | · | · | · | · | · | · | 0 |
+| Financial agent OpenAI SDK | · | · | · | · | · | · | · | · | · | 0 |
+| Multi-agent investment research | **2** | · | · | · | · | · | · | · | · | 2 |
+| Production agentic RAG course | · | · | · | **1** | · | · | · | **1** | · | 2 |
+| Production LLM+RAG with LLMOps | · | · | **2** | · | · | · | · | · | · | 2 |
+| NVIDIA RAG chatbots Windows | · | · | · | **1** | **2** | **2** | · | **2** | · | 7 |
+| YouTube Full Text Search CLI | · | · | · | · | · | · | · | · | · | 0 |
+| On-premises conversational RAG | · | · | **5** | · | **2** | · | · | · | · | 7 |
+| MCP knowledge graph RAG | · | · | · | · | · | · | · | **1** | · | 1 |
+| Forward-Looking Active REtrieval | **1** | · | · | · | · | · | · | · | · | 1 |
+| Visual Document RAG agents | · | · | · | · | **3** | **4** | · | **2** | · | 9 |
+| RAG retrieval + re-ranking toolkit | · | · | · | · | **1** | · | · | · | · | 1 |
+| Hierarchical knowledge RAG | · | · | · | · | · | · | · | · | · | 0 |
+| Multimodal RAG Framework | · | · | · | · | · | · | · | · | · | 0 |
+| Corrective RAG | · | · | · | · | · | · | · | · | · | 0 |
+| RAG with txtai | · | · | · | · | · | · | · | · | · | 0 |
+| Text-to-SQL RAG with ChromaDB+FAISS | **3** | · | **1** | · | · | · | · | **2** | · | 6 |
+| Personal knowledge base RAG | · | · | · | · | · | · | · | · | · | 0 |
+| MultiHop RAG evaluation | · | · | · | · | **2** | **1** | · | **1** | · | 4 |
+| Agentic RAG via RL | · | · | · | · | · | · | · | · | · | 0 |
+| Agentic RAG from GitHub repos | · | · | · | **1** | · | · | · | · | · | 1 |
+| RAG on codebases with LanceDB | · | · | · | · | · | · | · | · | · | 0 |
+| Local LLM with RAG | · | · | · | · | · | · | · | · | · | 0 |
+| Complex reasoning agentic RAG | · | · | · | · | · | · | · | · | · | 0 |
+| AI-powered local chatbot | · | · | **4** | **3** | **1** | · | · | · | · | 8 |
+| Air-gapped LLMs toolkit | · | · | **2** | · | **3** | **3** | · | **1** | · | 9 |
+| Hybrid RAG vector+graph | · | · | **2** | · | · | · | · | **1** | · | 3 |
+| Naive to Agentic to GraphRAG | **2** | · | · | · | **7** | **13** | · | **1** | · | 23 |
+| GPT with web browsing | · | · | · | · | · | **1** | · | · | · | 1 |
+| ChromaDB-based memory | · | · | · | · | **4** | **6** | · | **4** | · | 14 |
+| Multimodal RAG with Milvus | · | · | · | · | · | · | · | · | · | 0 |
+| Local RAG with Qdrant | · | · | · | · | · | **1** | · | · | · | 1 |
+| Privacy-first multimodal RAG | **1** | · | **1** | · | **4** | **2** | · | **1** | · | 9 |
+| Agentic RAG for drug intelligence | · | · | · | · | · | · | · | · | · | 0 |
+| Agentic RAG for small LMs | · | · | · | · | · | · | · | · | · | 0 |
+| Multi-agent RAG with Qdrant | · | · | **2** | · | **1** | **1** | · | · | · | 4 |
+| Local RAG Ollama+ChromaDB | **1** | · | · | · | **3** | **3** | · | **3** | · | 10 |
+| Containerized RAG with Qdrant | · | · | · | **2** | · | · | · | · | · | 2 |
+| Chat PDF LangChain+ChromaDB | · | · | · | · | **2** | **1** | · | **1** | · | 4 |
+| RAG ops with cache layers | · | · | **2** | **1** | **3** | · | **2** | **2** | · | 10 |
+| Semantic search for Gmail | · | · | · | · | · | · | · | **1** | · | 1 |
+| LLMs + vector stores framework | · | · | **2** | · | · | · | · | **2** | · | 4 |
+| Agentic RAG FAISS+BM25 | **1** | · | **2** | · | · | · | · | **2** | · | 5 |
+| Search PDF LangChain+ChromaDB | · | · | · | · | **1** | **2** | · | **1** | · | 4 |
+| Chat with docs multi-LLM | · | · | **5** | · | **2** | **3** | · | **1** | · | 11 |
+| LangChain Pinecone RAG | · | · | · | · | **5** | **4** | · | **5** | · | 14 |
+| Multimodal RAG semantic search | · | · | · | · | · | · | · | · | · | 0 |
+| Multimodal data representation | · | · | · | · | · | · | · | **3** | · | 3 |
+| Prompt testing for LLMs+vector DBs | **1** | · | · | · | · | · | · | **2** | · | 3 |
+| Qdrant MCP server | · | · | · | · | · | · | · | · | · | 0 |
+| Python Qdrant client | · | · | · | · | · | · | · | · | · | 0 |
+| AI spreadsheet with LLM pipelines | · | · | · | **5** | · | · | · | · | · | 5 |
+| Graph-vector memory service | · | · | · | · | · | · | · | · | · | 0 |
+| OSINT analysis with embeddings | · | · | **1** | · | **1** | · | · | **2** | · | 4 |
+| AI Assistant with Qdrant | **3** | · | **54** | · | · | · | · | **82** | · | 139 |
+| Conversational agent Qdrant | · | · | **1** | · | · | **1** | · | · | · | 2 |
+| Weaviate Python client | **1** | · | **4** | · | · | · | · | **8** | · | 13 |
+| Reverse image search CLIP+Qdrant | · | · | **1** | · | · | · | · | · | · | 1 |
+| Document app Qdrant+BGE | · | · | **1** | · | **2** | **2** | · | **1** | · | 6 |
+| ChromaDB chatbot | · | · | · | · | · | · | · | **2** | · | 2 |
+| ETL for vector databases | · | · | · | · | · | · | · | **4** | · | 4 |
+| Weaviate Agent Skills | · | · | · | · | · | · | · | · | · | 0 |
+| Multi-Agent LLM Trading | · | · | · | · | · | · | · | · | · | 0 |
+| Zero-Code LLM Agent Framework | **15** | · | · | **1** | · | · | · | **1** | · | 17 |
+| Low-code multi-agent with memory | · | · | **1** | **17** | **1** | · | **1** | **2** | · | 22 |
+| Multi-Agent Orchestration | **1** | · | · | **1** | · | · | · | · | · | 2 |
+| Multi-Agent Programming LLMs | **5** | · | **2** | · | · | · | · | **6** | · | 13 |
+| Multi-agent poster generation | **65** | · | **4** | **10** | · | · | · | **8** | · | 87 |
+| Multi-agent deep research | · | · | **1** | **2** | · | · | · | **1** | · | 4 |
+| No-code multi-agent framework | · | · | · | **2** | · | **1** | · | **3** | · | 6 |
+| LLM multi-agent framework | **3** | · | **2** | · | · | · | · | · | · | 5 |
+| LLM Agent Framework ComfyUI | · | · | · | **7** | **2** | **7** | · | **2** | · | 18 |
+| Agentic Memory for LLM Agents | · | · | · | · | · | · | · | **4** | · | 4 |
+| General memory for agents | · | · | · | · | · | · | · | · | · | 0 |
+| MCP long-term agent memory | · | · | · | · | · | · | · | · | · | 0 |
+| Agency Swarm experiments | **3** | · | · | **1** | · | · | · | · | · | 4 |
+| AI observability for agents | · | · | · | **2** | · | · | · | · | · | 2 |
+| AI web framework FastAPI+Pydantic | · | · | · | · | · | · | · | · | · | 0 |
+| Airflow + Pydantic AI agents | · | · | · | · | · | · | · | · | · | 0 |
+| Deep Agent on Pydantic-AI | · | · | · | · | · | · | · | · | · | 0 |
+| PydanticAI research agent | · | · | · | · | · | · | · | · | · | 0 |
+| MongoDB RAG with Pydantic AI | · | · | · | · | · | · | · | · | · | 0 |
+| Agent memory with Redis | · | · | **6** | · | · | · | · | **1** | · | 7 |
+| Smolagents framework examples | · | · | · | **1** | · | · | · | · | · | 1 |
+| Langroid multi-agent examples | · | · | · | · | · | · | · | · | · | 0 |
+| 7-layer memory for AI Agents | **1** | · | · | · | · | · | · | **2** | · | 3 |
+| DeepSearch with smolagents | · | · | · | · | · | · | · | · | · | 0 |
+| Hallucination eval agent memory | · | · | · | · | · | · | · | · | · | 0 |
+| Autonomous agent LLM | · | · | · | · | · | · | · | · | · | 0 |
+| LLM with vector DB memory | · | · | · | · | · | · | · | **1** | · | 1 |
+| Graph Retriever for QA | · | · | · | · | · | · | · | · | · | 0 |
+| DSPy+Weaviate retrieval | · | · | · | · | · | · | · | · | · | 0 |
 
 *Legend: number = findings count, · = not detected, — = not scanned*
 

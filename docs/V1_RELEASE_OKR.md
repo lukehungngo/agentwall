@@ -284,7 +284,7 @@ STEP 5: O5 — Package + Launch
 - [x] Engine StoreProfile is the primary decision source for MEM rules
 - [x] RAG + AGT + MEM + TOOL rules fire on any Python project (framework-agnostic) — Done: 291/345 projects get findings
 - [x] 6 frameworks with adapters (LangChain, LlamaIndex, CrewAI, OpenAI Agents, AutoGen, vectorstore_direct)
-- [ ] 290 of 362 benchmark projects get findings (80%) — target 300+, dropped after P0 fix removed 2,239 false TOOL-002 findings
+- [x] 380 of 480 benchmark projects get findings (79%) — 486 projects registered, target was 300+
 - [x] SER-003 FP rate <25% (4 AST heuristics implemented)
 - [x] GitHub Action created (`action.yml`) — needs testing on 3 real repos before marketplace publish
 - [x] README quickstart updated with correct badges and framework table
