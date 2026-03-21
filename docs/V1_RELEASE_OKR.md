@@ -182,9 +182,9 @@ The 39 estimated FP fall into 4 AST-local patterns (no interprocedural taint nee
 
 | KR    | Metric           | Current            | Target                      | How                                                                       | Required | Status          |
 | ----- | ---------------- | ------------------ | --------------------------- | ------------------------------------------------------------------------- | -------- | --------------- |
-| KR3.1 | GitHub Action    | None               | Published to marketplace    | `action.yml`: composite action, install agentwall, run scan, upload SARIF | Yes      | **Not Started** |
+| KR3.1 | GitHub Action    | None               | Published to marketplace    | `action.yml`: composite action, install agentwall, run scan, upload SARIF | Yes      | **Done** |
 | KR3.2 | PR comment       | None               | Findings diff in PR         | Action posts comment with new/resolved findings vs base branch            | No       | **Not Started** |
-| KR3.3 | Quality gate     | `--fail-on` exists | Documented in Action README | Already implemented. Document.                                            | Yes      | **Not Started** |
+| KR3.3 | Quality gate     | `--fail-on` exists | Documented in Action README | Already implemented. Documented in `action.yml` header comment.           | Yes      | **Done** |
 | KR3.4 | Incremental scan | None               | <30s on PR diff             | `--changed-files` flag — only scan files in git diff                      | No       | **Not Started** |
 
 ### GitHub Action Design
@@ -196,15 +196,16 @@ on: [push, pull_request]
 jobs:
   scan:
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write   # required for SARIF upload
     steps:
       - uses: actions/checkout@v4
       - uses: agentwall/scan-action@v1
         with:
+          path: '.'
           format: sarif
-          fail-on: high
-      - uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: agentwall.sarif
+          fail-on: high          # critical|high|medium|low|none
+          upload-sarif: 'true'   # posts findings to GitHub Security tab
 ```
 
 ---
@@ -285,7 +286,7 @@ STEP 5: O5 — Package + Launch
 - [x] 6 frameworks with adapters (LangChain, LlamaIndex, CrewAI, OpenAI Agents, AutoGen, vectorstore_direct)
 - [ ] 300+ of 349 benchmark projects get findings — currently 291/345 (84%)
 - [x] SER-003 FP rate <25% (4 AST heuristics implemented)
-- [ ] GitHub Action published and tested on 3 real repos
+- [x] GitHub Action created (`action.yml`) — needs testing on 3 real repos before marketplace publish
 - [ ] README quickstart works in <2 minutes on a clean machine
 - [ ] Every rule has description, severity, fix guidance (CLI + docs)
 - [ ] `pip install agentwall && agentwall scan . --format sarif` works on clean machine

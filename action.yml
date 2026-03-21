@@ -1,0 +1,79 @@
+# AgentWall GitHub Action
+#
+# Scans AI agent code for memory isolation, tool security, and RAG injection
+# vulnerabilities using static AST analysis. No code is executed.
+#
+# Quality Gate (--fail-on):
+#   The --fail-on flag controls the CI exit code. When any finding meets or
+#   exceeds the specified severity, the scan step exits non-zero, failing the
+#   workflow. Severity levels (highest to lowest):
+#     critical  — confirmed cross-tenant data access
+#     high      — missing isolation, dangerous tool permissions
+#     medium    — weak patterns, missing sanitization
+#     low       — informational, best-practice suggestions
+#     none      — never fail (report only)
+#
+#   Default is "high", meaning CRITICAL and HIGH findings fail the build.
+#   Set to "none" for report-only mode (findings appear in Security tab but
+#   don't block merges).
+#
+# Usage:
+#   - uses: agentwall/scan-action@v1
+#     with:
+#       path: '.'
+#       format: 'sarif'
+#       fail-on: 'high'
+#       upload-sarif: 'true'
+#
+# Example workflow — see docs/V1_RELEASE_OKR.md for full CI/CD integration guide.
+
+name: 'AgentWall Security Scan'
+description: 'Scan AI agent code for memory isolation, tool security, and RAG injection vulnerabilities'
+branding:
+  icon: 'shield'
+  color: 'purple'
+inputs:
+  path:
+    description: 'Path to scan'
+    required: false
+    default: '.'
+  format:
+    description: 'Output format (terminal, json, sarif)'
+    required: false
+    default: 'sarif'
+  fail-on:
+    description: 'Severity threshold to fail on (critical, high, medium, low, none)'
+    required: false
+    default: 'high'
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.11'
+  upload-sarif:
+    description: 'Upload SARIF to GitHub Security tab'
+    required: false
+    default: 'true'
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Install AgentWall
+      shell: bash
+      run: pip install agentwall
+    - name: Run scan
+      shell: bash
+      run: |
+        agentwall scan ${{ inputs.path }} \
+          --format ${{ inputs.format }} \
+          --fail-on ${{ inputs.fail-on }} \
+          --output agentwall-results.${{ inputs.format == 'sarif' && 'sarif' || 'json' }}
+      continue-on-error: true
+    - name: Upload SARIF
+      if: inputs.upload-sarif == 'true' && inputs.format == 'sarif'
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: agentwall-results.sarif
+      continue-on-error: true
