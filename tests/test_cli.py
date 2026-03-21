@@ -347,6 +347,45 @@ class TestCliVerify:
         assert data["finding_count"] >= 1
 
 
+class TestCliRules:
+    def test_rules_command(self) -> None:
+        result = runner.invoke(app, ["rules"])
+        assert result.exit_code == 0
+        assert "AW-MEM-001" in result.output
+        assert "AW-TOOL-001" in result.output
+        assert "MEMORY rules:" in result.output
+
+    def test_rules_lists_all_categories(self) -> None:
+        result = runner.invoke(app, ["rules"])
+        assert result.exit_code == 0
+        assert "MEMORY rules:" in result.output
+        assert "TOOL rules:" in result.output
+        assert "SECRETS rules:" in result.output
+        assert "RAG rules:" in result.output
+
+
+class TestCliExplain:
+    def test_explain_known_rule(self) -> None:
+        result = runner.invoke(app, ["explain", "AW-MEM-001"])
+        assert result.exit_code == 0
+        assert "AW-MEM-001" in result.output
+        assert "No tenant isolation" in result.output
+        assert "Description:" in result.output
+        assert "Fix:" in result.output
+        assert "CRITICAL" in result.output
+
+    def test_explain_unknown_rule(self) -> None:
+        result = runner.invoke(app, ["explain", "FAKE-001"])
+        assert result.exit_code == 2
+        assert "unknown rule ID" in result.output
+
+    def test_explain_tool_rule(self) -> None:
+        result = runner.invoke(app, ["explain", "AW-TOOL-001"])
+        assert result.exit_code == 0
+        assert "AW-TOOL-001" in result.output
+        assert "approval gate" in result.output.lower()
+
+
 class TestCliVersion:
     def test_version_output(self) -> None:
         result = runner.invoke(app, ["version"])

@@ -254,6 +254,46 @@ def verify(
 
 
 @app.command()
+def rules() -> None:
+    """List all AgentWall security rules."""
+    from agentwall.rules import ALL_RULES
+
+    # Group rules by category
+    by_category: dict[str, list[tuple[str, str, str]]] = {}
+    for rule_id, rule in ALL_RULES.items():
+        cat = rule.category.value
+        by_category.setdefault(cat, []).append((rule_id, rule.title, rule.severity.value))
+
+    for cat in sorted(by_category):
+        typer.echo(f"\n{cat.upper()} rules:")
+        typer.echo("-" * 70)
+        for rule_id, title, severity in by_category[cat]:
+            typer.echo(f"  {rule_id:<14} {severity:<10} {title}")
+    typer.echo()
+
+
+@app.command()
+def explain(
+    rule_id: str = typer.Argument(..., help="Rule ID (e.g. AW-MEM-001)"),  # noqa: B008
+) -> None:
+    """Explain a specific AgentWall rule."""
+    from agentwall.rules import ALL_RULES
+
+    rule = ALL_RULES.get(rule_id)
+    if rule is None:
+        typer.echo(f"Error: unknown rule ID: {rule_id}. Valid: {sorted(ALL_RULES)}", err=True)
+        raise typer.Exit(2)
+
+    typer.echo(f"\n{rule.rule_id}: {rule.title}")
+    typer.echo("=" * 60)
+    typer.echo(f"Severity:    {rule.severity.value.upper()}")
+    typer.echo(f"Category:    {rule.category.value}")
+    typer.echo(f"\nDescription:\n  {rule.description}")
+    typer.echo(f"\nFix:\n  {rule.fix}")
+    typer.echo()
+
+
+@app.command()
 def version() -> None:
     """Show AgentWall version."""
     from agentwall import __version__
