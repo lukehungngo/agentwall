@@ -10,7 +10,7 @@
 
 | Dimension          | Reality                                                      | Production Standard            | Gap      |
 | ------------------ | ------------------------------------------------------------ | ------------------------------ | -------- |
-| Framework adapters | 3 (LangChain, LlamaIndex, CrewAI)                            | 5+ with deep analysis          | Medium   |
+| Framework adapters | **6 (LangChain, LlamaIndex, CrewAI, OpenAI Agents, AutoGen, vectorstore_direct)** | 5+ with deep analysis | **Done** |
 | FP rate            | **3.2% estimated** (MEM-001: 0%, SER-003: 17%, SEC-003: 12%) | <15%                           | **Met**  |
 | Engine integration | IsolationEvidence drives MEM findings                        | Engine drives all findings     | **Done** |
 | Detection coverage | **291/345 projects get findings (84%)**                      | >85%                           | Low      |
@@ -143,19 +143,19 @@ The 39 estimated FP fall into 4 AST-local patterns (no interprocedural taint nee
 
 | KR     | Framework          | Projects Detected | Stars (top project) | How                                                                                                                                                   | Required | Status          |
 | ------ | ------------------ | ----------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------------- |
-| KR2B.1 | OpenAI Agents SDK  | ~15               | 7k                  | `adapters/openai_agents.py`: detect `Agent()`, `Runner.run()`, tool functions, handoffs. Similar pattern to CrewAI adapter.                           | Yes      | **Not Started** |
-| KR2B.2 | AutoGen            | ~5                | 48k                 | `adapters/autogen.py`: detect `ConversableAgent`, `AssistantAgent`, `register_function`, `initiate_chat`.                                             | Yes      | **Not Started** |
-| KR2B.3 | Pydantic AI        | ~3                | 15k                 | `adapters/pydantic_ai.py`: detect `Agent()`, `@agent.tool`, embeddings API. Add `pydantic_ai` to `_FRAMEWORK_SIGNATURES`.                             | No       | **Not Started** |
-| KR2B.4 | vectorstore_direct | ~10               | varies              | `adapters/vectorstore_direct.py`: lightweight adapter for raw chromadb/pinecone/qdrant SDK usage. Extract store instances without framework patterns. | Yes      | **Not Started** |
+| KR2B.1 | OpenAI Agents SDK  | ~15               | 7k                  | `adapters/openai_agents.py`: 200 LOC, 13 tests. Detects Agent(), Runner.run(), @function_tool, handoffs. | Yes      | **Done** |
+| KR2B.2 | AutoGen            | ~5                | 48k                 | `adapters/autogen.py`: 200 LOC, 14 tests. Detects ConversableAgent, AssistantAgent, register_for_llm/execution. | Yes      | **Done** |
+| KR2B.3 | Pydantic AI        | ~3                | 15k                 | Detection added (KR2C.1). Adapter not yet needed — agnostic rules cover it. | No       | **Deferred** |
+| KR2B.4 | vectorstore_direct | ~10               | varies              | `adapters/vectorstore_direct.py`: 200 LOC, 13 tests. Detects raw chromadb/faiss/pinecone/qdrant/milvus/weaviate SDK usage. | Yes      | **Done** |
 
 ### Step 2C: Expand Framework Detection
 
 | KR     | Target                    | How                                                                   | Required | Status          |
 | ------ | ------------------------- | --------------------------------------------------------------------- | -------- | --------------- |
-| KR2C.1 | Pydantic AI detection     | Add `pydantic_ai` to `_FRAMEWORK_SIGNATURES` in `detector.py`         | Yes      | **Not Started** |
-| KR2C.2 | GraphRAG detection        | Add `graphrag` to `_FRAMEWORK_SIGNATURES`. Custom embedding patterns. | No       | **Not Started** |
-| KR2C.3 | DSPy detection            | Add `dspy` to `_FRAMEWORK_SIGNATURES`                                 | No       | **Not Started** |
-| KR2C.4 | Semantic Kernel detection | Add `semantic_kernel` to `_FRAMEWORK_SIGNATURES`                      | No       | **Not Started** |
+| KR2C.1 | Pydantic AI detection     | Added to `_FRAMEWORK_SIGNATURES` + test | Yes      | **Done** |
+| KR2C.2 | GraphRAG detection        | Added to `_FRAMEWORK_SIGNATURES` + test | No       | **Done** |
+| KR2C.3 | DSPy detection            | Added to `_FRAMEWORK_SIGNATURES` + test | No       | **Done** |
+| KR2C.4 | Semantic Kernel detection | Added to `_FRAMEWORK_SIGNATURES` + test | No       | **Done** |
 
 ### Step 2D: Previously Completed
 
@@ -282,8 +282,8 @@ STEP 5: O5 — Package + Launch
 - [x] 3+ frameworks with full analysis (LangChain + LlamaIndex + CrewAI)
 - [x] Engine StoreProfile is the primary decision source for MEM rules
 - [x] RAG + AGT + MEM + TOOL rules fire on any Python project (framework-agnostic) — Done: 291/345 projects get findings
-- [ ] 5+ frameworks with adapters (add OpenAI Agents, AutoGen, vectorstore_direct)
-- [ ] 300+ of 349 benchmark projects get findings
+- [x] 6 frameworks with adapters (LangChain, LlamaIndex, CrewAI, OpenAI Agents, AutoGen, vectorstore_direct)
+- [ ] 300+ of 349 benchmark projects get findings — currently 291/345 (84%)
 - [x] SER-003 FP rate <25% (4 AST heuristics implemented)
 - [ ] GitHub Action published and tested on 3 real repos
 - [ ] README quickstart works in <2 minutes on a clean machine
