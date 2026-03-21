@@ -409,3 +409,88 @@ class TestIsLibraryFile:
         p.parent.mkdir(parents=True, exist_ok=True)
         p.touch()
         assert _is_library_file(p, tmp_path) is False
+
+
+class TestIsLibraryFileSelfLibrary:
+    """Self-library: core library paths → True, examples/demos → normal logic."""
+
+    def test_self_library_core_src_file(self, tmp_path: Path) -> None:
+        """Core library code in self-library → True."""
+        p = tmp_path / "src" / "langchain" / "vectorstores" / "chroma.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+        assert _is_library_file(p, tmp_path, is_self_library=True) is True
+
+    def test_self_library_root_module_file(self, tmp_path: Path) -> None:
+        """Root-level module file in self-library → True."""
+        p = tmp_path / "chromadb" / "api.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+        assert _is_library_file(p, tmp_path, is_self_library=True) is True
+
+    def test_self_library_examples_dir(self, tmp_path: Path) -> None:
+        """Examples dir in self-library → False (use normal severity)."""
+        p = tmp_path / "examples" / "rag_app.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+        # examples/ is in _NON_PRODUCTION_DIRS, so it returns True via that path
+        # This is correct — it IS non-production code
+        assert _is_library_file(p, tmp_path, is_self_library=True) is True
+
+    def test_self_library_recipes_dir(self, tmp_path: Path) -> None:
+        """Recipes dir in self-library → NOT library code (mini-app)."""
+        p = tmp_path / "recipes" / "chatbot.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+        # recipes/ is in _SELF_LIBRARY_APP_DIRS — excluded from self-library downgrade
+        # but NOT in _NON_PRODUCTION_DIRS, so it should return False
+        assert _is_library_file(p, tmp_path, is_self_library=True) is False
+
+    def test_self_library_apps_dir(self, tmp_path: Path) -> None:
+        """Apps dir in self-library → NOT library code (real app)."""
+        p = tmp_path / "apps" / "server.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+        assert _is_library_file(p, tmp_path, is_self_library=True) is False
+
+    def test_self_library_samples_dir(self, tmp_path: Path) -> None:
+        """Samples dir in self-library → NOT library code (mini-app)."""
+        p = tmp_path / "samples" / "demo.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+        assert _is_library_file(p, tmp_path, is_self_library=True) is False
+
+    def test_not_self_library_src_file(self, tmp_path: Path) -> None:
+        """Without self-library flag, production code → False."""
+        p = tmp_path / "src" / "langchain" / "vectorstores" / "chroma.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+        assert _is_library_file(p, tmp_path, is_self_library=False) is False
+
+
+class TestIsLibraryFileVendoredDirs:
+    """Files in vendored/third-party dirs are library code."""
+
+    def test_vendor_dir(self, tmp_path: Path) -> None:
+        p = tmp_path / "_vendor" / "requests" / "api.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+        assert _is_library_file(p, tmp_path) is True
+
+    def test_third_party_dir(self, tmp_path: Path) -> None:
+        p = tmp_path / "third_party" / "chromadb" / "client.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+        assert _is_library_file(p, tmp_path) is True
+
+    def test_vendored_dir(self, tmp_path: Path) -> None:
+        p = tmp_path / "vendored" / "lib.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+        assert _is_library_file(p, tmp_path) is True
+
+    def test_external_dir(self, tmp_path: Path) -> None:
+        p = tmp_path / "external" / "lib.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+        assert _is_library_file(p, tmp_path) is True

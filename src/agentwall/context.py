@@ -57,6 +57,10 @@ class AnalysisContext:
     # Populated by L6 engine
     path_coverages: list[PathCoverage] | None = None
 
+    # True when the scan target IS a framework/vector-store library.
+    # Computed once by scanner; consumed by _is_library_file() in evidence collection.
+    is_self_library: bool = False
+
     # Accumulated findings from all layers
     findings: list[Finding] = field(default_factory=list)
 

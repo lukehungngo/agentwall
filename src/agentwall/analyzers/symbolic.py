@@ -241,7 +241,7 @@ class SymbolicAnalyzer:
                         has_filter=False,
                         filter_is_tenant_scoped=False,
                         collection_is_dynamic=False,
-                        is_library_code=_is_library_file(py_file, ctx.target),
+                        is_library_code=_is_library_file(py_file, ctx.target, is_self_library=ctx.is_self_library),
                         has_web_framework=has_web_fw,
                     )
                     severity, confidence, _reason = classify_isolation(evidence)
@@ -269,7 +269,7 @@ class SymbolicAnalyzer:
                         has_filter=False,
                         filter_is_tenant_scoped=False,
                         collection_is_dynamic=False,
-                        is_library_code=_is_library_file(py_file, ctx.target),
+                        is_library_code=_is_library_file(py_file, ctx.target, is_self_library=ctx.is_self_library),
                         has_web_framework=has_web_fw,
                     )
                     severity, confidence, _reason = classify_isolation(evidence)

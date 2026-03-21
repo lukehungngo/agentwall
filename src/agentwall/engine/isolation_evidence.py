@@ -215,8 +215,10 @@ def collect_evidence(
     else:
         evidence.has_web_framework = project_has_web_framework(ctx)
 
-    # is_library_code: check source file path
-    evidence.is_library_code = _is_library_file(mc.source_file, ctx.target)
+    # is_library_code: check source file path + self-library flag
+    evidence.is_library_code = _is_library_file(
+        mc.source_file, ctx.target, is_self_library=ctx.is_self_library
+    )
 
     return evidence
 
@@ -292,13 +294,56 @@ def _is_non_production_path(source_file: Path, target: Path) -> bool:
     return bool(rel_parts & _NON_PRODUCTION_DIRS)
 
 
-def _is_library_file(source_file: Path | None, target: Path) -> bool:
+# Directories that contain vendored or third-party code within a project.
+_VENDORED_DIRS: frozenset[str] = frozenset(
+    {
+        "_vendor",
+        "vendor",
+        "vendored",
+        "third_party",
+        "thirdparty",
+        "3rdparty",
+        "external",
+    }
+)
+
+# Directories that contain examples/demos/apps within a library repo.
+# These are NOT core library code even when the project IS a self-library.
+_SELF_LIBRARY_APP_DIRS: frozenset[str] = frozenset(
+    {
+        "examples",
+        "example",
+        "demos",
+        "demo",
+        "apps",
+        "applications",
+        "recipes",
+        "samples",
+        "sample",
+        "quickstart",
+        "templates",
+        "starters",
+        "cookbooks",
+        "tutorials",
+    }
+)
+
+
+def _is_library_file(
+    source_file: Path | None,
+    target: Path,
+    *,
+    is_self_library: bool = False,
+) -> bool:
     """Check if a source file is library/framework code (not user code).
 
     A file is considered library code if:
     - Its path contains "site-packages/"
     - It is outside the scan target directory
+    - It is in a vendored/third-party directory
     - It is in a test/example/template directory relative to the target
+    - The scan target IS a self-library AND the file is in core library
+      paths (not examples/demos/apps — those use normal severity logic)
     """
     if source_file is None:
         return False
@@ -313,7 +358,16 @@ def _is_library_file(source_file: Path | None, target: Path) -> bool:
     except ValueError:
         return True
 
-    # File is in a non-production directory relative to the scan target
-    # (tests/, examples/, templates/, etc.)
     rel_parts = {p.lower() for p in relative.parts}
-    return bool(rel_parts & _NON_PRODUCTION_DIRS)
+
+    # Vendored/third-party directories within the project
+    if rel_parts & _VENDORED_DIRS:
+        return True
+
+    # Non-production directories (tests, examples, etc.)
+    if rel_parts & _NON_PRODUCTION_DIRS:
+        return True
+
+    # Self-library: core library paths only. Examples/demos/apps within a
+    # library repo should use normal severity logic (they ARE mini-apps).
+    return is_self_library and not (rel_parts & _SELF_LIBRARY_APP_DIRS)

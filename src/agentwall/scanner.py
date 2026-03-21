@@ -14,6 +14,7 @@ from agentwall.context import AnalysisContext
 from agentwall.detector import _source_files, auto_detect_framework
 from agentwall.models import Finding, ScanConfig, ScanResult
 from agentwall.postprocess import apply_file_context, dedup, sort
+from agentwall.scoping import is_self_library_project
 
 if TYPE_CHECKING:
     from agentwall.context import Analyzer
@@ -160,7 +161,13 @@ def scan(
             "Only framework-agnostic analyzers will run."
         )
 
-    ctx = AnalysisContext(target=target, config=config, spec=spec, source_files=source_files)
+    ctx = AnalysisContext(
+        target=target,
+        config=config,
+        spec=spec,
+        source_files=source_files,
+        is_self_library=is_self_library_project(target),
+    )
 
     # ── Run analyzers in dependency order ─────────────────────────────────
     ordered = _resolve_order(ANALYZERS, layers)
